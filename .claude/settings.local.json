@@ -103,7 +103,8 @@
       "Bash(node -e \"process.stdin.on\\(''''data'''',d=>{const m=JSON.parse\\(d\\).models||[];m.forEach\\(x=>console.log\\(x.name,''''VRAM:''''+Math.round\\(x.size_vram/1e9\\)+''''GB'''',''''CPU:''''+Math.round\\(\\(x.size-x.size_vram\\)/1e9\\)+''''GB''''\\)\\)}\\)\")",
       "Bash(node -e \"process.stdin.on\\(''''data'''',d=>{const m=JSON.parse\\(d\\).models||[];if\\(!m.length\\){console.log\\(''''No models loaded''''\\)}else{m.forEach\\(x=>console.log\\(x.name,''''VRAM:''''+Math.round\\(x.size_vram/1e9\\)+''''GB'''',''''expires:''''+x.expires_at\\)\\)}}\\)\")",
       "Bash(node src/index.js --dry-run --cloud)",
-      "Bash(node src/index.js --dry-run --cloud --test)"
+      "Bash(node src/index.js --dry-run --cloud --test)",
+      "Bash(node src/index.js --dry-run --test --cloud)"
     ]
   }
 }

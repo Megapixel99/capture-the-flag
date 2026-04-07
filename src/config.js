@@ -182,7 +182,7 @@ const CONFIG = {
     cloudMode,
     segmented: segmentedMode,
     // Realtime timing
-    defensePhaseMinutes: parseFloat(process.env.DEFENSE_MINUTES || '1'),
+    defensePhaseMinutes: parseFloat(process.env.DEFENSE_MINUTES || '0.5'),
     battlePhaseMinutes: parseFloat(process.env.BATTLE_MINUTES || '15'),
   },
 
