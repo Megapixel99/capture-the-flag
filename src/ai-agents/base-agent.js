@@ -117,11 +117,13 @@ class BaseAgent {
       }
     }
 
-    // Execute the command on the container
+    // Execute the command on the container — use shorter timeout in realtime mode
+    // so one slow command doesn't block the round-robin for all other agents
+    const cmdTimeout = Math.min(CONFIG.game.commandTimeoutMs, 15000); // 15s max per command
     let execResult = { stdout: '', stderr: '', exitCode: -1 };
     if (parsed.command && parsed.command !== 'NONE' && parsed.command !== 'SKIP') {
       try {
-        execResult = await execCommand(this.containerName, parsed.command);
+        execResult = await execCommand(this.containerName, parsed.command, cmdTimeout);
       } catch (err) {
         execResult = { stdout: '', stderr: `Execution error: ${err.message}`, exitCode: -1 };
       }
