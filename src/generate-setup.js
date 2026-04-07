@@ -345,11 +345,11 @@ Execution Modes:
 
   Cloud (--cloud): Uses Ollama Cloud API (ollama.com) for hosted inference.
     All agents run truly in parallel — each has its own concurrent loop. Response
-    times are ~2-5 seconds. Supports full-size models (Gemma 4 31B, GPT-OSS 120B,
+    times are ~2-5 seconds. Supports full-size models (GLM-5.1, GPT-OSS 120B,
     Gemini 3 Flash). Requires OLLAMA_API_KEY from ollama.com/settings/keys.
 
     Default cloud models:
-      - gemma4:31b (Google Gemma 4, 31B parameters)
+      - glm-5.1:cloud (Zhipu GLM-5.1)
       - gpt-oss:120b (OpenAI GPT-OSS, 120B parameters)
       - gemini-3-flash-preview:cloud (Google Gemini 3 Flash)
 
@@ -644,7 +644,7 @@ Test Mode (no API keys required):
 
 Useful Commands:
   Cloud (recommended — full-size models, true parallel execution):
-  - npm run start:cloud          # 3 models via Ollama Cloud (gemma4, gpt-oss, gemini3)
+  - npm run start:cloud          # 3 models via Ollama Cloud (glm-5.1, gpt-oss, gemini3)
 
   Local (small models, no API costs):
   - npm run start:local-only     # 5 open models via local Ollama — zero API keys
@@ -724,7 +724,7 @@ All keys should have sufficient quota for the planned number of game rounds.
 Estimated usage per game: ~500-1000 API calls total (10 agents x 50 rounds).
 
 When using --local mode, OPENAI_API_KEY and GEMINI_API_KEY are NOT required
-(Qwen 3.5 and Gemma 4 run locally via Ollama).
+(Qwen 3.5 and Gemma 3 run locally via Ollama).
 
 ================================================================================
 14. LOCAL MODELS VIA OLLAMA (Qwen 3.5 & GEMMA 4)
@@ -733,7 +733,7 @@ When using --local mode, OPENAI_API_KEY and GEMINI_API_KEY are NOT required
 Two of the five AI players can run locally via Ollama, eliminating API costs
 for those players. This replaces:
   - ChatGPT (OpenAI GPT-4o) → Qwen 3.5 20B (OpenAI's open-weight model)
-  - Gemini (Google) → Gemma 4 E2B (Google's open-weight model)
+  - Gemini (Google) → Gemma 3 1B (Google's open-weight model)
 
 The remaining three players (Claude, Grok, Perplexity) still require API keys.
 
@@ -750,10 +750,10 @@ Open Models (all served via Ollama):
     - Alibaba's open model with reasoning and tool-calling support
     - Override: OLLAMA_GPT_MODEL=qwen3.5:4b (for larger variant, 3.4GB)
 
-  Gemini slot → Gemma 4 E2B:
-    - Ollama tag: gemma4:e2b (~5GB)
+  Gemini slot → Gemma 3 1B:
+    - Ollama tag: gemma3:1b (~0.8GB)
     - Google's open model, built from Gemini 3 architecture
-    - Override: OLLAMA_GEMMA_MODEL=gemma4:26b (for GPU, 18GB)
+    - Override: OLLAMA_GEMMA_MODEL=gemma3:4b (for larger variant)
 
   Claude slot → Phi-4 Reasoning:
     - Ollama tag: phi4-reasoning (~9GB)
@@ -842,7 +842,7 @@ Running Cloud (Ollama Cloud API — full-size models, true parallel):
   Run "npm run start:cloud" for hosted inference with no local GPU needed:
   - 3 player VMs, all agents run in parallel via ollama.com API
   - Requires OLLAMA_API_KEY (get at ollama.com/settings/keys)
-  - Gemma 4 31B, GPT-OSS 120B, Gemini 3 Flash compete
+  - GLM-5.1, GPT-OSS 120B, Gemini 3 Flash compete
   - ${CONFIG.game.defensePhaseMinutes} min defense + ${CONFIG.game.battlePhaseMinutes} min battle (~5.5 min total)
   - Mid-game vulnerability injection keeps the game dynamic
 
@@ -870,7 +870,7 @@ Running All (10 teams — cloud vs open, side-by-side):
     USE_LOCAL_MODELS=true       # Alternative to --local flag (hybrid mode)
     OLLAMA_BASE_URL=...         # Custom Ollama URL (default: localhost:11434)
     OLLAMA_GPT_MODEL=...        # Override Qwen 3.5 model variant
-    OLLAMA_GEMMA_MODEL=...      # Override Gemma 4 model variant
+    OLLAMA_GEMMA_MODEL=...      # Override Gemma model variant
 
 Running Segmented (DMZ + Internal, lateral movement):
   Run "npm run start:segmented" for the two-tier network simulation.
