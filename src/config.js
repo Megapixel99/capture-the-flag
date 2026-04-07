@@ -151,8 +151,8 @@ const CONFIG = {
     allMode,
     segmented: segmentedMode,
     // Realtime timing
-    defensePhaseMinutes: parseFloat(process.env.DEFENSE_MINUTES || '3'),
-    battlePhaseMinutes: parseFloat(process.env.BATTLE_MINUTES || '15'),
+    defensePhaseMinutes: parseFloat(process.env.DEFENSE_MINUTES || '10'),
+    battlePhaseMinutes: parseFloat(process.env.BATTLE_MINUTES || '60'),
   },
 
   scoring: {

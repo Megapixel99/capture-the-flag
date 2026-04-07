@@ -1,6 +1,6 @@
 ================================================================================
 AI CTF ATTACK-DEFEND GAME — SETUP & RESEARCH DOCUMENTATION
-Generated: 2026-04-07T15:00:29.826Z
+Generated: 2026-04-07T15:04:30.553Z
 ================================================================================
 
 TABLE OF CONTENTS
@@ -335,12 +335,12 @@ Command Execution:
 Realtime Game Structure:
   The game uses a two-phase realtime system (not turn-based rounds):
 
-  Phase 1 — Defense (default: 3 minutes):
+  Phase 1 — Defense (default: 10 minutes):
     Only defender agents are active. Each defender runs in its own async loop,
     issuing commands as fast as the AI model can respond. Attackers are held
     back during this phase, giving defenders time to harden their machines.
 
-  Phase 2 — Battle (default: 15 minutes):
+  Phase 2 — Battle (default: 60 minutes):
     ALL agents (attackers AND defenders) run simultaneously. Each agent
     operates in its own independent loop. There are no turns or rounds —
     agents act continuously until time expires or the game ends early.
@@ -798,7 +798,7 @@ Running Local-Only (zero API keys — 5 open models):
   - No API keys needed whatsoever
   - Qwen 3.5, Gemma 3, SmolLM2, Granite 3.1, and Llama 3.2 compete
   - All 5 models need ~8GB GPU memory (feasible on 64GB Mac)
-  - 3 min defense + 15 min battle
+  - 10 min defense + 60 min battle
 
   Usage:
     npm run start:local-only                                        # Default timing
