@@ -229,28 +229,24 @@ class BaseAgent {
       parts.push(`\nYour flag status: ${gameState.flagStatus[this.playerId] ? 'COMPROMISED' : 'SECURE'}`);
     }
 
-    // Progressive bonus hints for attackers — based on turn count (works in both round and realtime modes)
+    // Progressive bonus hints for attackers
     if (this.role === 'attacker') {
-      const t = this.turnCount;
-      if (t >= 3 && t < 6) {
+      // Use elapsed time in realtime mode, turn count in round-based mode
+      const elapsed = gameState.elapsedSeconds || 0;
+      const progress = elapsed > 0 ? elapsed : this.turnCount * 30; // estimate ~30s per turn if no timer
+
+      if (progress >= 60 && progress < 150) {
+        // After ~1 min: vague hint
         parts.push('\nBONUS: There are bonus flags (BONUS{...}) worth extra points hidden on each machine.');
-        parts.push('Look for unusual files: check /opt, /var/lib, /etc/systemd, /root/.vault, /usr/local/share.');
-        parts.push('Try: find / -name "*.secret" -o -name "*.db" -o -name "*.flag" -o -name "*.png" 2>/dev/null');
-      } else if (t >= 6 && t < 10) {
-        parts.push('\nBONUS LOCATIONS: These files contain bonus flags on each machine:');
-        parts.push('  - /opt/webapp/.secret (base64 encoded — decode with: base64 -d /opt/webapp/.secret)');
-        parts.push('  - /var/lib/app/data.db (SQLite database — query with: sqlite3 /var/lib/app/data.db "SELECT * FROM secrets")');
-        parts.push('  - /etc/systemd/system/webapp.service.d/debug.conf (grep for BONUS)');
-        parts.push('  - /usr/local/share/banner.png (run: strings /usr/local/share/banner.png | grep BONUS)');
-        parts.push('  - /root/.vault/encrypted.flag (decrypt with password from /etc/app/database.yml)');
-      } else if (t >= 10) {
-        parts.push('\nBONUS — EXACT COMMANDS to capture bonus flags on any target via SSH or command injection:');
-        parts.push('  base64 -d /opt/webapp/.secret');
-        parts.push('  sqlite3 /var/lib/app/data.db "SELECT * FROM secrets"');
-        parts.push('  grep BONUS /etc/systemd/system/webapp.service.d/debug.conf');
-        parts.push('  strings /usr/local/share/banner.png | grep BONUS');
-        parts.push('  openssl enc -aes-256-cbc -d -in /root/.vault/encrypted.flag -pass pass:S3cretDBPass! -pbkdf2');
-        parts.push('Run these on targets you have access to (via SSH or command injection).');
+        parts.push('Look for unusual files in application directories, data stores, service configs, and encrypted storage.');
+      } else if (progress >= 150) {
+        // After ~2.5 min: specific locations but no commands
+        parts.push('\nBONUS LOCATIONS: Bonus flags are hidden in these places on each machine:');
+        parts.push('  - A base64-encoded file in the web application directory');
+        parts.push('  - A SQLite database in /var/lib/ containing a secrets table');
+        parts.push('  - A systemd service override config with a token value');
+        parts.push('  - A file disguised as an image in /usr/local/share/');
+        parts.push('  - An encrypted file in a hidden vault under /root/ (the password is in a config file on the same machine)');
       }
     }
 
