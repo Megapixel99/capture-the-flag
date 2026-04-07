@@ -190,41 +190,46 @@ class GameEngine {
   /**
    * Run a single agent in a loop until the phase ends or game is over.
    */
-  async agentLoop(agent, playerId, role, phaseEndTime) {
-    let loopCount = 0;
-    while (Date.now() < phaseEndTime && !this.gameOver) {
-      loopCount++;
-      try {
-        const gameState = this.buildGameState();
-        const result = await agent.takeTurn(gameState);
-        const cmd = (result.command || 'SKIP').substring(0, 80);
-        console.log(`  [${playerId}/${role}] ${cmd}`);
+  /**
+   * Run a single agent turn. Returns true if game should end.
+   */
+  async runAgentTurn(agent, playerId, role) {
+    try {
+      const gameState = this.buildGameState();
+      const result = await agent.takeTurn(gameState);
+      const cmd = (result.command || 'SKIP').substring(0, 80);
+      console.log(`  [${playerId}/${role}] ${cmd}`);
 
-        // Check for flag captures (attacker only)
-        if (role === 'attacker' && result.flagCaptured && result.result) {
-          this.processCapture(playerId, result.result);
-
-          // Check if game should end
-          if (this.shouldEndGame()) {
-            const survivor = this.getLastSurvivor();
-            console.log(`\n[Game] === GAME OVER — only ${survivor} has an uncaptured flag! ===\n`);
-            logGameEvent({
-              message: `Game ended early — ${survivor} is the last team standing`,
-              survivor,
-            });
-            this.gameOver = true;
-            return;
-          }
+      if (role === 'attacker' && result.flagCaptured && result.result) {
+        this.processCapture(playerId, result.result);
+        if (this.shouldEndGame()) {
+          const survivor = this.getLastSurvivor();
+          console.log(`\n[Game] === GAME OVER — only ${survivor} has an uncaptured flag! ===\n`);
+          logGameEvent({ message: `Game ended early — ${survivor} is the last team standing`, survivor });
+          this.gameOver = true;
+          return true;
         }
-      } catch (err) {
-        console.error(`  [${playerId}/${role}] ERROR: ${err.message}`);
       }
+    } catch (err) {
+      console.error(`  [${playerId}/${role}] ERROR: ${err.message}`);
+    }
+    return false;
+  }
 
-      // Flush logs periodically so they're available even if game is interrupted
-      if (loopCount % 10 === 0) flushAll();
-
-      // Small breather to prevent hammering Ollama
-      await sleep(500);
+  /**
+   * Round-robin loop: cycles through a list of agents one at a time until time expires.
+   * Each agent gets one turn, then the next agent goes. This keeps only one model on GPU.
+   */
+  async roundRobinLoop(agentList, phaseEndTime, phaseName) {
+    let turnCount = 0;
+    while (Date.now() < phaseEndTime && !this.gameOver) {
+      for (const { agent, playerId, role } of agentList) {
+        if (Date.now() >= phaseEndTime || this.gameOver) break;
+        const ended = await this.runAgentTurn(agent, playerId, role);
+        if (ended) return;
+        turnCount++;
+        if (turnCount % 10 === 0) flushAll();
+      }
     }
   }
 
@@ -279,16 +284,19 @@ class GameEngine {
     this.phaseStartTime = Date.now();
     const defenseEnd = Date.now() + defMins * 60 * 1000;
 
-    // Start all defender loops + background vuln checker
-    const defenderLoops = [];
+    // Build defender agent list for round-robin
+    const defenders = [];
     for (const player of CONFIG.players) {
-      defenderLoops.push(this.agentLoop(this.agents[player.id].defender, player.id, 'defender', defenseEnd));
+      defenders.push({ agent: this.agents[player.id].defender, playerId: player.id, role: 'defender' });
       if (this.agents[player.id].internalDefender) {
-        defenderLoops.push(this.agentLoop(this.agents[player.id].internalDefender, player.id, 'int-defender', defenseEnd));
+        defenders.push({ agent: this.agents[player.id].internalDefender, playerId: player.id, role: 'int-defender' });
       }
     }
-    defenderLoops.push(this.vulnCheckLoop(defenseEnd, 'defense'));
-    await Promise.all(defenderLoops);
+    // Run defenders in round-robin + vuln checker in background
+    await Promise.all([
+      this.roundRobinLoop(defenders, defenseEnd, 'defense'),
+      this.vulnCheckLoop(defenseEnd, 'defense'),
+    ]);
 
     if (this.gameOver) {
       this.calculateFinalScores();
@@ -308,17 +316,20 @@ class GameEngine {
     this.phaseStartTime = Date.now();
     const battleEnd = Date.now() + batMins * 60 * 1000;
 
-    // Start ALL agent loops + background vuln checker
-    const battleLoops = [];
+    // Build full agent list: attackers interleaved with defenders for fair scheduling
+    const battleAgents = [];
     for (const player of CONFIG.players) {
-      battleLoops.push(this.agentLoop(this.agents[player.id].attacker, player.id, 'attacker', battleEnd));
-      battleLoops.push(this.agentLoop(this.agents[player.id].defender, player.id, 'defender', battleEnd));
+      battleAgents.push({ agent: this.agents[player.id].attacker, playerId: player.id, role: 'attacker' });
+      battleAgents.push({ agent: this.agents[player.id].defender, playerId: player.id, role: 'defender' });
       if (this.agents[player.id].internalDefender) {
-        battleLoops.push(this.agentLoop(this.agents[player.id].internalDefender, player.id, 'int-defender', battleEnd));
+        battleAgents.push({ agent: this.agents[player.id].internalDefender, playerId: player.id, role: 'int-defender' });
       }
     }
-    battleLoops.push(this.vulnCheckLoop(battleEnd, 'battle'));
-    await Promise.all(battleLoops);
+    // Run battle in round-robin + vuln checker in background
+    await Promise.all([
+      this.roundRobinLoop(battleAgents, battleEnd, 'battle'),
+      this.vulnCheckLoop(battleEnd, 'battle'),
+    ]);
 
     // Award survival points — 50 per minute survived (proportional to battle phase length)
     for (const player of CONFIG.players) {
