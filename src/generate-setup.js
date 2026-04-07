@@ -332,21 +332,54 @@ Realtime Game Structure:
     agents act continuously until time expires or the game ends early.
 
   Timing is configurable via environment variables:
-    DEFENSE_MINUTES=3     # Duration of defense-only phase
-    BATTLE_MINUTES=15     # Duration of simultaneous battle phase
+    DEFENSE_MINUTES=0.5   # Duration of defense-only phase (default: 30 seconds)
+    BATTLE_MINUTES=5      # Duration of simultaneous battle phase (default: 5 min)
 
   This realtime system mirrors actual cybersecurity operations where
   defenders and attackers operate continuously, not in discrete turns.
 
-Realtime Execution via Ollama:
-  A single Ollama instance serves all models. Requests are processed serially
-  at the GPU level (one inference at a time), but agent loops run concurrently —
-  while one agent's request is being processed, others queue up automatically.
-  With 5-15 second response times per model, agents naturally interleave,
-  giving each model multiple turns per minute.
+Execution Modes:
+  Local (--local-only): A single Ollama instance serves all models via round-robin.
+    Agents take turns sequentially due to GPU constraints. Each agent gets a turn
+    every ~30-60 seconds. Best for small models on consumer hardware.
 
-  Each model is pre-warmed at startup with keep_alive=60m. Ollama swaps models
-  on/off GPU as needed. The small models (~1-3GB each) load in seconds.
+  Cloud (--cloud): Uses Ollama Cloud API (ollama.com) for hosted inference.
+    All agents run truly in parallel — each has its own concurrent loop. Response
+    times are ~2-5 seconds. Supports full-size models (Gemma 4 31B, GPT-OSS 120B,
+    Gemini 3 Flash). Requires OLLAMA_API_KEY from ollama.com/settings/keys.
+
+    Default cloud models:
+      - gemma4:31b (Google Gemma 4, 31B parameters)
+      - gpt-oss:120b (OpenAI GPT-OSS, 120B parameters)
+      - gemini-3-flash-preview:cloud (Google Gemini 3 Flash)
+
+    Note: Cloud API has usage limits. A 5.5-minute game (30s defense + 5min battle)
+    with 3 models uses approximately 4% of the 4-hour API limit.
+
+Mid-Game Vulnerability Injection:
+  During the battle phase, a background process injects new vulnerabilities into
+  random machines at random intervals (every 2-7 minutes). This simulates zero-day
+  attacks, configuration drift, and attacker persistence. The injection pool includes:
+
+  New services / backdoors:
+    - Backdoor cron job copying the flag to a world-readable location
+    - Netcat listener on port 4444 serving a shell
+    - World-readable flag copy in /var/www/
+    - Unauthorized SSH key added to root
+    - Webshell script planted in the web service directory
+    - Hidden backdoor user with root privileges
+
+  Reverted patches (simulating configuration drift):
+    - Root password reset to default
+    - Shadow file permissions reverted to world-readable
+    - SUID re-enabled on binaries
+    - Vulnerable web service restarted
+    - Cron scripts made writable again
+    - Sudo misconfiguration re-added
+
+  Each injection is logged to game.json with the vulnerability name, target
+  machine, description, and timestamp. Defenders must continuously monitor
+  and re-harden, while attackers get new opportunities throughout the game.
 
 Scoring — Main Flags:
   - +${CONFIG.scoring.flagCapturedFirst} points: first attacker to capture a team's main flag
@@ -597,22 +630,26 @@ Test Mode (no API keys required):
     node src/index.js --test --skip-docker        # Test without Docker (dry logic only)
 
 Useful Commands:
-  Flat network (default):
-  - npm start                    # 5 cloud AI players (all API keys required)
-  - npm run start:local          # Hybrid: 2 local (Ollama) + 3 cloud API
-  - npm run start:local-only     # 5 open models via Ollama — zero API keys
-  - npm run start:all            # 10 teams: 5 cloud + 5 open, side-by-side
-  - npm run test-game            # Scripted bots, no APIs, no Ollama needed
+  Cloud (recommended — full-size models, true parallel execution):
+  - npm run start:cloud          # 3 models via Ollama Cloud (gemma4, gpt-oss, gemini3)
 
-  Segmented network (DMZ + Internal, lateral movement):
-  - npm run start:segmented      # 5 teams, 10 containers, local models
-  - npm run start:segmented-test # 5 teams, 10 containers, scripted bots
+  Local (small models, no API costs):
+  - npm run start:local-only     # 5 open models via local Ollama — zero API keys
+  - npm run start:local          # Hybrid: 2 local + 3 cloud API
+
+  Vendor APIs:
+  - npm start                    # 5 vendor AI players (all API keys required)
+  - npm run start:all            # 10 teams: vendor + open, side-by-side
+
+  Segmented network:
+  - npm run start:segmented      # DMZ + Internal zones, lateral movement
+
+  Testing:
+  - npm run test-game            # Scripted bots, no APIs, no Ollama needed
+  - npm run dry-run              # Validate config without starting containers
 
   General:
-  - npm run dry-run              # Validate config without starting containers
-  - npm run up                   # Start all containers
   - npm run down                 # Stop and remove all containers
-  - npm run logs                 # View game logs
 
 Inspecting During/After Game:
   - docker exec -it ctf-chatgpt bash    # Shell into a container
@@ -780,15 +817,25 @@ Running with Local Models (hybrid — 2 local + 3 API):
 
 Running Local-Only (zero API keys — 5 open models):
   Run "npm run start:local-only" for the fully free, self-contained setup:
-  - 5 player VMs, each with a dedicated Ollama instance
+  - 5 player VMs, round-robin agent scheduling via local Ollama
   - No API keys needed whatsoever
   - Qwen 3.5, Gemma 3, SmolLM2, Granite 3.1, and Llama 3.2 compete
-  - All 5 models need ~8GB GPU memory (feasible on 64GB Mac)
-  - ${CONFIG.game.defensePhaseMinutes} min defense + ${CONFIG.game.battlePhaseMinutes} min battle
 
   Usage:
     npm run start:local-only                                        # Default timing
-    DEFENSE_MINUTES=1 BATTLE_MINUTES=5 npm run start:local-only     # Quick test
+    DEFENSE_MINUTES=1 BATTLE_MINUTES=10 npm run start:local-only    # Custom timing
+
+Running Cloud (Ollama Cloud API — full-size models, true parallel):
+  Run "npm run start:cloud" for hosted inference with no local GPU needed:
+  - 3 player VMs, all agents run in parallel via ollama.com API
+  - Requires OLLAMA_API_KEY (get at ollama.com/settings/keys)
+  - Gemma 4 31B, GPT-OSS 120B, Gemini 3 Flash compete
+  - ${CONFIG.game.defensePhaseMinutes} min defense + ${CONFIG.game.battlePhaseMinutes} min battle (~5.5 min total)
+  - Mid-game vulnerability injection keeps the game dynamic
+
+  Usage:
+    npm run start:cloud                                             # Default timing
+    DEFENSE_MINUTES=1 BATTLE_MINUTES=10 npm run start:cloud         # Longer game
     node src/index.js --test --local-only         # Test with scripted bots, 5 open players
 
 Running All (10 teams — cloud vs open, side-by-side):
