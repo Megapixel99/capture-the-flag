@@ -486,6 +486,15 @@ class GameEngine {
     }
     await this.runAgents(battleAgents, battleEnd, 'battle');
 
+    // If game ended early (flag capture or rate limit), skip to scoring
+    if (this.gameOver) {
+      this.calculateFinalScores();
+      logScoreboard(this.scores);
+      flushAll();
+      logGameEvent({ message: 'Game ended', finalScores: this.scores });
+      return this.scores;
+    }
+
     // Award survival points — 50 per minute survived (proportional to battle phase length)
     for (const player of CONFIG.players) {
       if (!this.flagStatus[player.id]) {
