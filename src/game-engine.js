@@ -33,6 +33,7 @@ class GameEngine {
     this.originalFlags = {};  // { playerId: string (original flag content) }
     this.allBonusFlags = {};  // { bonusFlagString: { tier, container, points } }
     this.capturedBonuses = {}; // { attackerId: Set of bonus flag strings }
+    this.rateLimited = false;
     this.networkInfo = null;
     this.currentRound = 0;
   }
@@ -213,6 +214,12 @@ class GameEngine {
         }
       }
     } catch (err) {
+      if (err.isRateLimitExhausted) {
+        console.error(`\n[Game] === RATE LIMITED — API capacity exhausted. Stopping game. ===\n`);
+        this.gameOver = true;
+        this.rateLimited = true;
+        return true;
+      }
       console.error(`  [${playerId}/${role}] ERROR: ${err.message}`);
     }
     return false;

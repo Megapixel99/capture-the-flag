@@ -254,6 +254,20 @@ async function main() {
     // Run the game
     const finalScores = await engine.runGame();
 
+    // If rate limited, delete the incomplete session and stop
+    if (engine.rateLimited) {
+      console.log('[Main] Game interrupted by rate limiting — deleting incomplete session.');
+      try {
+        const { rmSync } = require('fs');
+        rmSync(sessionDir, { recursive: true, force: true });
+        console.log(`[Main] Deleted: ${sessionDir}`);
+      } catch (e) {
+        console.error(`[Main] Failed to delete session: ${e.message}`);
+      }
+      await stopContainers();
+      process.exit(1);
+    }
+
     console.log('\n[Main] Game complete! Logs saved to:', sessionDir);
     console.log('[Main] Files generated:');
     console.log('  - game.json (all events)');

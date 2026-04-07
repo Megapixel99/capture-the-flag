@@ -46,10 +46,14 @@ class OllamaCloudAgent extends BaseAgent {
         const isRateLimit = status === 429 || msg.includes('rate limit') || msg.includes('capacity');
 
         if (isRateLimit && attempt < maxRetries) {
-          // Wait 60 seconds and retry
           console.log(`  [${this.playerId}/${this.role}] Rate limited — waiting 60s (attempt ${attempt}/${maxRetries})`);
           await new Promise(r => setTimeout(r, 60000));
           continue;
+        }
+        if (isRateLimit) {
+          const rateLimitErr = new Error('RATE_LIMIT_EXHAUSTED');
+          rateLimitErr.isRateLimitExhausted = true;
+          throw rateLimitErr;
         }
         throw err;
       }
