@@ -87,7 +87,17 @@
       "Bash(git init:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(for port:*)",
+      "Bash(do echo:*)",
+      "Bash(curl -s --max-time 3 http://localhost:$port/api/tags)",
+      "Bash(node -e \"process.stdin.on\\(''''data'''',d=>{try{const m=JSON.parse\\(d\\).models||[];console.log\\(m.map\\(x=>x.name\\).join\\('''', ''''\\)||''''no models''''\\)}catch{console.log\\(''''unreachable''''\\)}}\\)\")",
+      "Bash(done)",
+      "Bash(curl -s --max-time 3 http://localhost:$port/api/ps)",
+      "Bash(node -e \"process.stdin.on\\(''''data'''',d=>{try{const m=JSON.parse\\(d\\).models||[];console.log\\(m.map\\(x=>x.name+'''' \\(''''+x.size_vram/1e9+''''GB ''''+x.processor+''''\\)''''\\).join\\('''', ''''\\)||''''none''''\\)}catch\\(e\\){console.log\\(''''error: ''''+e.message\\)}}\\)\")",
+      "Bash(curl -s http://localhost:$port/api/ps)",
+      "Bash(node -e \"process.stdin.on\\(''''data'''',d=>{try{const m=JSON.parse\\(d\\).models||[];console.log\\(m.map\\(x=>x.name+'''' \\(''''+Math.round\\(x.size_vram/1e9\\)+''''GB VRAM\\)''''\\).join\\('''', ''''\\)||''''none''''\\)}catch{console.log\\(''''?''''\\)}}\\)\")",
+      "Bash(node -e \"process.stdin.on\\(''''data'''',d=>{try{const m=JSON.parse\\(d\\).models||[];console.log\\(m.map\\(x=>x.name+'''' VRAM:''''+Math.round\\(x.size_vram/1e9\\)+''''GB CPU:''''+Math.round\\(\\(x.size-x.size_vram\\)/1e9\\)+''''GB proc:''''+x.details.parameter_size\\).join\\('''', ''''\\)||''''none''''\\)}catch\\(e\\){console.log\\(''''err: ''''+e.message\\)}}\\)\")"
     ]
   }
 }

@@ -338,20 +338,14 @@ Realtime Game Structure:
   This realtime system mirrors actual cybersecurity operations where
   defenders and attackers operate continuously, not in discrete turns.
 
-Parallel Execution via Multi-Instance Ollama:
-  Each AI model gets its own dedicated Ollama instance on a separate port,
-  enabling true parallel execution. All 5 models can respond simultaneously.
+Parallel Execution via Ollama:
+  A single Ollama instance serves all models with concurrent request support.
+  The game auto-starts Ollama with OLLAMA_NUM_PARALLEL and OLLAMA_MAX_LOADED_MODELS
+  set to the number of unique models, so all models stay loaded in GPU memory
+  and can serve requests simultaneously.
 
-  Port assignments (configurable via OLLAMA_BASE_PORT):
-    Port 11434: Qwen 3.5 (qwen3.5:2b)
-    Port 11435: Gemma 3 (gemma3:1b)
-    Port 11436: SmolLM2 (smollm2:1.7b)
-    Port 11437: Granite 3.1 (granite3.1-dense:2b)
-    Port 11438: Llama 3.2 (llama3.2:1b)
-
-  Instances are auto-launched at startup. Each keeps its model loaded in
-  GPU memory with keep_alive=60m. All share the same model storage directory
-  so downloaded models don't need to be pulled per-instance.
+  All 5 small models fit in ~8GB GPU memory on Apple Silicon (unified memory).
+  Each model is pre-warmed at startup with keep_alive=60m to prevent unloading.
 
 Scoring — Main Flags:
   - +${CONFIG.scoring.flagCapturedFirst} points: first attacker to capture a team's main flag
@@ -759,25 +753,25 @@ Hardware Requirements (default small models):
   Response times with GPU (Apple Silicon / NVIDIA): 5-15 seconds per response.
   Response times on CPU only: may exceed 5 minutes — not recommended.
 
-Multi-Instance Ollama (parallel execution):
-  The game automatically launches 5 separate Ollama instances, one per model,
-  on consecutive ports (11434-11438). This enables true parallel execution:
-  all 5 AI models can respond simultaneously without waiting for each other.
+Ollama Parallel Execution:
+  The game auto-starts a single Ollama instance configured for concurrent
+  request handling. Environment variables set at startup:
+    OLLAMA_NUM_PARALLEL=5      — allows 5 concurrent requests
+    OLLAMA_MAX_LOADED_MODELS=5 — keeps all 5 models loaded in GPU memory
 
-  Instances are auto-launched at startup with OLLAMA_HOST=0.0.0.0:PORT.
-  Each model is pulled and pre-warmed (loaded into GPU memory) before the
-  game begins. Models are kept loaded with keep_alive=60m.
+  All models are pulled and pre-warmed (loaded into GPU) before the game
+  begins. Models are kept loaded with keep_alive=60m.
 
-  Port assignments (override with OLLAMA_BASE_PORT):
-    11434: qwen3.5:2b     (2.7 GB)
-    11435: gemma3:1b      (0.8 GB)
-    11436: smollm2:1.7b   (1.8 GB)
-    11437: granite3.1:2b  (1.6 GB)
-    11438: llama3.2:1b    (1.3 GB)
-    Total GPU memory:     ~8.2 GB
+  Default models and sizes:
+    qwen3.5:2b          (2.7 GB)
+    gemma3:1b           (0.8 GB)
+    smollm2:1.7b        (1.8 GB)
+    granite3.1-dense:2b (1.6 GB)
+    llama3.2:1b         (1.3 GB)
+    Total GPU memory:   ~8.2 GB
 
-  If an instance is already running on a port, it is reused (not restarted).
-  All instances share the same model storage (~/.ollama/models).
+  If Ollama is already running, it is reused (not restarted). The existing
+  instance must have enough parallel capacity for all models.
 
 Running with Local Models (hybrid — 2 local + 3 API):
   1. Install Ollama natively (see above)

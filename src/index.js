@@ -117,11 +117,12 @@ async function main() {
     }
   }
 
-  // Launch Ollama instances for local models — one per model for true parallel execution
+  // Launch single Ollama instance with parallel request support for all local models
   if (CONFIG.game.useLocalModels && !testMode) {
     const { execSync, spawn } = require('child_process');
     const axios = require('axios');
     const ollamaPlayers = CONFIG.players.filter((p) => p.provider === 'ollama');
+    const url = CONFIG.api.ollama.baseUrl;
 
     // Find ollama binary
     let ollamaPath = null;
@@ -137,66 +138,61 @@ async function main() {
       process.exit(1);
     }
 
-    // Group players by port — each port gets one Ollama instance
-    const portMap = new Map();
-    for (const p of ollamaPlayers) {
-      const port = p.ollamaPort || 11434;
-      if (!portMap.has(port)) portMap.set(port, []);
-      portMap.get(port).push(p);
-    }
+    // Check if already running
+    console.log(`[Ollama] Checking ${url}...`);
+    let alive = false;
+    try {
+      const r = await axios.get(`${url}/api/tags`, { timeout: 2000 });
+      alive = r.status === 200;
+    } catch { /* not running */ }
 
-    console.log(`[Ollama] Launching ${portMap.size} Ollama instance(s) for ${ollamaPlayers.length} models...`);
+    if (!alive) {
+      // Start with parallel support — OLLAMA_NUM_PARALLEL allows concurrent model serving
+      const numModels = new Set(ollamaPlayers.map(p => p.model)).size;
+      const child = spawn(ollamaPath, ['serve'], {
+        detached: true, stdio: 'ignore',
+        env: {
+          ...process.env,
+          OLLAMA_NUM_PARALLEL: String(numModels),
+          OLLAMA_MAX_LOADED_MODELS: String(numModels),
+        },
+      });
+      child.unref();
+      console.log(`[Ollama] Started (PID ${child.pid}, parallel=${numModels})`);
 
-    for (const [port, players] of portMap) {
-      const url = `http://localhost:${port}`;
-      let alive = false;
-
-      // Check if already running
-      try {
-        const r = await axios.get(`${url}/api/tags`, { timeout: 2000 });
-        alive = r.status === 200;
-      } catch { /* not running */ }
-
-      if (!alive) {
-        const child = spawn(ollamaPath, ['serve'], {
-          detached: true, stdio: 'ignore',
-          env: { ...process.env, OLLAMA_HOST: `0.0.0.0:${port}` },
-        });
-        child.unref();
-        console.log(`[Ollama] Started instance on port ${port} (PID ${child.pid})`);
-
-        for (let i = 0; i < 15; i++) {
-          await new Promise((r) => setTimeout(r, 1000));
-          try {
-            const r2 = await axios.get(`${url}/api/tags`, { timeout: 2000 });
-            if (r2.status === 200) { alive = true; break; }
-          } catch { /* retry */ }
-        }
-        if (!alive) { console.error(`[ERROR] Ollama on port ${port} failed to start.`); process.exit(1); }
-      } else {
-        console.log(`[Ollama] Port ${port} already running.`);
-      }
-
-      // Pull and warm each model on this instance
-      for (const player of players) {
-        process.stdout.write(`[Ollama]   Port ${port}: ${player.model}...`);
+      for (let i = 0; i < 15; i++) {
+        await new Promise((r) => setTimeout(r, 1000));
         try {
-          const tags = await axios.get(`${url}/api/tags`, { timeout: 5000 });
-          const existing = (tags.data.models || []).map(m => m.name);
-          if (!existing.some(n => n === player.model || n.startsWith(player.model + ':'))) {
-            await axios.post(`${url}/api/pull`, { name: player.model, stream: false }, { timeout: 3600000 });
-          }
-          await axios.post(`${url}/api/chat`, {
-            model: player.model, messages: [{ role: 'user', content: 'hi' }],
-            stream: false, keep_alive: '60m', options: { num_predict: 1 },
-          }, { timeout: 300000 });
-          console.log(' ready');
-        } catch (err) {
-          console.log(` failed (${err.message})`);
+          const r2 = await axios.get(`${url}/api/tags`, { timeout: 2000 });
+          if (r2.status === 200) { alive = true; break; }
+        } catch { /* retry */ }
+      }
+      if (!alive) { console.error('[ERROR] Ollama failed to start.'); process.exit(1); }
+    } else {
+      console.log('[Ollama] Already running.');
+    }
+
+    // Pull and warm each model sequentially (they stay loaded in memory)
+    console.log(`[Ollama] Loading ${ollamaPlayers.length} models...`);
+    const uniqueModels = [...new Set(ollamaPlayers.map(p => p.model))];
+    for (const model of uniqueModels) {
+      process.stdout.write(`[Ollama]   ${model}...`);
+      try {
+        const tags = await axios.get(`${url}/api/tags`, { timeout: 5000 });
+        const existing = (tags.data.models || []).map(m => m.name);
+        if (!existing.some(n => n === model || n.startsWith(model + ':'))) {
+          await axios.post(`${url}/api/pull`, { name: model, stream: false }, { timeout: 3600000 });
         }
+        await axios.post(`${url}/api/chat`, {
+          model, messages: [{ role: 'user', content: 'hi' }],
+          stream: false, keep_alive: '60m', options: { num_predict: 1 },
+        }, { timeout: 300000 });
+        console.log(' ready');
+      } catch (err) {
+        console.log(` failed (${err.message})`);
       }
     }
-    console.log(`[Ollama] ${portMap.size} instance(s) ready.\n`);
+    console.log(`[Ollama] All models ready.\n`);
   }
 
   // Generate setup documentation
