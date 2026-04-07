@@ -229,6 +229,37 @@ class GameEngine {
   }
 
   /**
+   * Background loop that checks vulnerability status every 60 seconds.
+   * Logs the status and ends the game if all machines are fully patched.
+   */
+  async vulnCheckLoop(phaseEndTime, phaseName) {
+    let checkNumber = 0;
+    while (Date.now() < phaseEndTime && !this.gameOver) {
+      await sleep(60000); // Wait 1 minute
+      if (this.gameOver || Date.now() >= phaseEndTime) break;
+
+      checkNumber++;
+      const elapsed = Math.round((Date.now() - this.phaseStartTime) / 1000);
+      console.log(`\n[Game] === Vulnerability Check #${checkNumber} (${phaseName}, ${elapsed}s elapsed) ===`);
+
+      const allPatched = await this.checkAllVulnerabilities();
+      flushAll();
+
+      if (allPatched) {
+        console.log('\n[Game] === GAME OVER — all machines fully patched. No attack vectors remain. ===\n');
+        logGameEvent({
+          message: `Game ended — all vulnerabilities patched (${phaseName}, check #${checkNumber})`,
+          phaseName,
+          checkNumber,
+          elapsedSeconds: elapsed,
+        });
+        this.gameOver = true;
+        return;
+      }
+    }
+  }
+
+  /**
    * Run the full game in realtime mode:
    * Phase 1: Defense only (configurable minutes)
    * Phase 2: Battle — attackers AND defenders simultaneously (configurable minutes)
@@ -248,7 +279,7 @@ class GameEngine {
     this.phaseStartTime = Date.now();
     const defenseEnd = Date.now() + defMins * 60 * 1000;
 
-    // Start all defender loops
+    // Start all defender loops + background vuln checker
     const defenderLoops = [];
     for (const player of CONFIG.players) {
       defenderLoops.push(this.agentLoop(this.agents[player.id].defender, player.id, 'defender', defenseEnd));
@@ -256,21 +287,18 @@ class GameEngine {
         defenderLoops.push(this.agentLoop(this.agents[player.id].internalDefender, player.id, 'int-defender', defenseEnd));
       }
     }
+    defenderLoops.push(this.vulnCheckLoop(defenseEnd, 'defense'));
     await Promise.all(defenderLoops);
 
-    console.log('\n[Game] Defense phase ended.');
-    logGameEvent({ message: 'Defense phase ended' });
-
-    // Check vulnerabilities after defense phase
-    const allPatched = await this.checkAllVulnerabilities();
-    if (allPatched) {
-      console.log('\n[Game] === GAME OVER — all machines fully patched. No attack vectors remain. ===\n');
-      logGameEvent({ message: 'Game ended — all vulnerabilities patched after defense phase' });
+    if (this.gameOver) {
       this.calculateFinalScores();
       logScoreboard(this.scores);
       logGameEvent({ message: 'Game ended', finalScores: this.scores });
       return this.scores;
     }
+
+    console.log('\n[Game] Defense phase ended.');
+    logGameEvent({ message: 'Defense phase ended' });
 
     // === PHASE 2: BATTLE (attackers + defenders simultaneously) ===
     console.log(`\n[Game] === PHASE 2: BATTLE (${batMins} minutes) ===`);
@@ -280,7 +308,7 @@ class GameEngine {
     this.phaseStartTime = Date.now();
     const battleEnd = Date.now() + batMins * 60 * 1000;
 
-    // Start ALL agent loops — attackers and defenders run simultaneously
+    // Start ALL agent loops + background vuln checker
     const battleLoops = [];
     for (const player of CONFIG.players) {
       battleLoops.push(this.agentLoop(this.agents[player.id].attacker, player.id, 'attacker', battleEnd));
@@ -289,6 +317,7 @@ class GameEngine {
         battleLoops.push(this.agentLoop(this.agents[player.id].internalDefender, player.id, 'int-defender', battleEnd));
       }
     }
+    battleLoops.push(this.vulnCheckLoop(battleEnd, 'battle'));
     await Promise.all(battleLoops);
 
     // Award survival points — 50 per minute survived (proportional to battle phase length)
