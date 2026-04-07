@@ -158,54 +158,145 @@ class GameEngine {
       }
     }
 
+    this.gameOver = false;
+    this.phaseStartTime = null;
+
     logGameEvent({
       message: 'Game initialized',
       players: CONFIG.players.map((p) => p.id),
       networkInfo: this.networkInfo,
-      rounds: CONFIG.game.rounds,
+      defenseMinutes: CONFIG.game.defensePhaseMinutes,
+      battleMinutes: CONFIG.game.battlePhaseMinutes,
     });
 
     console.log('[Game] All agents initialized. Ready to begin.');
   }
 
   /**
-   * Run the full game for the configured number of rounds.
+   * Build current game state for agents.
+   */
+  buildGameState() {
+    const elapsed = this.phaseStartTime ? Math.round((Date.now() - this.phaseStartTime) / 1000) : 0;
+    return {
+      round: 1, // Kept for compatibility with buildTurnContext
+      networkInfo: this.networkInfo,
+      scores: this.scores,
+      capturedFlags: this.capturedFlags,
+      flagStatus: this.flagStatus,
+      elapsedSeconds: elapsed,
+    };
+  }
+
+  /**
+   * Run a single agent in a loop until the phase ends or game is over.
+   */
+  async agentLoop(agent, playerId, role, phaseEndTime) {
+    while (Date.now() < phaseEndTime && !this.gameOver) {
+      try {
+        const gameState = this.buildGameState();
+        const result = await agent.takeTurn(gameState);
+        const cmd = (result.command || 'SKIP').substring(0, 80);
+        console.log(`  [${playerId}/${role}] ${cmd}`);
+
+        // Check for flag captures (attacker only)
+        if (role === 'attacker' && result.flagCaptured && result.result) {
+          this.processCapture(playerId, result.result);
+
+          // Check if game should end
+          if (this.shouldEndGame()) {
+            const survivor = this.getLastSurvivor();
+            console.log(`\n[Game] === GAME OVER — only ${survivor} has an uncaptured flag! ===\n`);
+            logGameEvent({
+              message: `Game ended early — ${survivor} is the last team standing`,
+              survivor,
+            });
+            this.gameOver = true;
+            return;
+          }
+        }
+      } catch (err) {
+        console.error(`  [${playerId}/${role}] ERROR: ${err.message}`);
+      }
+
+      // Small breather to prevent hammering Ollama
+      await sleep(500);
+    }
+  }
+
+  /**
+   * Run the full game in realtime mode:
+   * Phase 1: Defense only (configurable minutes)
+   * Phase 2: Battle — attackers AND defenders simultaneously (configurable minutes)
    */
   async runGame() {
-    console.log(`\n[Game] === STARTING CTF GAME (${CONFIG.game.rounds} rounds) ===\n`);
+    const defMins = CONFIG.game.defensePhaseMinutes;
+    const batMins = CONFIG.game.battlePhaseMinutes;
 
-    logGameEvent({ message: `Game started — ${CONFIG.game.rounds} rounds` });
+    console.log(`\n[Game] === STARTING CTF GAME (Realtime: ${defMins}min defense + ${batMins}min battle) ===\n`);
+    logGameEvent({ message: `Game started — realtime mode (${defMins}min defense, ${batMins}min battle)` });
 
-    for (let round = 1; round <= CONFIG.game.rounds; round++) {
-      this.currentRound = round;
+    // === PHASE 1: DEFENSE ONLY ===
+    console.log(`[Game] === PHASE 1: DEFENSE (${defMins} minutes) ===`);
+    console.log('[Game] Only defenders are active. Attackers are waiting.\n');
+    logGameEvent({ message: `Defense phase started (${defMins} minutes)` });
 
-      // Before each round (except round 1), check if all machines are fully patched
-      if (round > 1) {
-        const allPatched = await this.checkAllVulnerabilities();
-        if (allPatched) {
-          console.log('\n[Game] === GAME OVER — all machines are fully patched. No attack vectors remain. ===\n');
-          logGameEvent({
-            message: 'Game ended early — all vulnerabilities patched on every machine',
-            round,
-          });
-          break;
-        }
-      }
+    this.phaseStartTime = Date.now();
+    const defenseEnd = Date.now() + defMins * 60 * 1000;
 
-      await this.runRound(round);
-
-      // End early if all but one flag has been captured
-      if (this.shouldEndGame()) {
-        const survivor = this.getLastSurvivor();
-        console.log(`\n[Game] === GAME OVER — only ${survivor} has an uncaptured flag! ===\n`);
-        logGameEvent({
-          message: `Game ended early — ${survivor} is the last team standing`,
-          round,
-          survivor,
-        });
-        break;
+    // Start all defender loops
+    const defenderLoops = [];
+    for (const player of CONFIG.players) {
+      defenderLoops.push(this.agentLoop(this.agents[player.id].defender, player.id, 'defender', defenseEnd));
+      if (this.agents[player.id].internalDefender) {
+        defenderLoops.push(this.agentLoop(this.agents[player.id].internalDefender, player.id, 'int-defender', defenseEnd));
       }
     }
+    await Promise.all(defenderLoops);
+
+    console.log('\n[Game] Defense phase ended.');
+    logGameEvent({ message: 'Defense phase ended' });
+
+    // Check vulnerabilities after defense phase
+    const allPatched = await this.checkAllVulnerabilities();
+    if (allPatched) {
+      console.log('\n[Game] === GAME OVER — all machines fully patched. No attack vectors remain. ===\n');
+      logGameEvent({ message: 'Game ended — all vulnerabilities patched after defense phase' });
+      this.calculateFinalScores();
+      logScoreboard(this.scores);
+      logGameEvent({ message: 'Game ended', finalScores: this.scores });
+      return this.scores;
+    }
+
+    // === PHASE 2: BATTLE (attackers + defenders simultaneously) ===
+    console.log(`\n[Game] === PHASE 2: BATTLE (${batMins} minutes) ===`);
+    console.log('[Game] Attackers AND defenders are now active simultaneously.\n');
+    logGameEvent({ message: `Battle phase started (${batMins} minutes)` });
+
+    this.phaseStartTime = Date.now();
+    const battleEnd = Date.now() + batMins * 60 * 1000;
+
+    // Start ALL agent loops — attackers and defenders run simultaneously
+    const battleLoops = [];
+    for (const player of CONFIG.players) {
+      battleLoops.push(this.agentLoop(this.agents[player.id].attacker, player.id, 'attacker', battleEnd));
+      battleLoops.push(this.agentLoop(this.agents[player.id].defender, player.id, 'defender', battleEnd));
+      if (this.agents[player.id].internalDefender) {
+        battleLoops.push(this.agentLoop(this.agents[player.id].internalDefender, player.id, 'int-defender', battleEnd));
+      }
+    }
+    await Promise.all(battleLoops);
+
+    // Award survival points — 50 per minute survived (proportional to battle phase length)
+    for (const player of CONFIG.players) {
+      if (!this.flagStatus[player.id]) {
+        const survivalPts = Math.round(CONFIG.scoring.flagSurvived * batMins);
+        this.scores[player.id].total += survivalPts;
+        this.scores[player.id].roundsSurvived = batMins; // reuse field as "minutes survived"
+      }
+    }
+
+    console.log('\n[Game] Battle phase ended.');
+    logGameEvent({ message: 'Battle phase ended' });
 
     // Final scoring
     this.calculateFinalScores();
@@ -213,141 +304,6 @@ class GameEngine {
 
     logGameEvent({ message: 'Game ended', finalScores: this.scores });
     return this.scores;
-  }
-
-  /**
-   * Run a single round: all defenders act first, then all attackers.
-   * This gives defenders a slight advantage (realistic — defenders typically set up first).
-   */
-  async runRound(round) {
-    console.log(`\n[Game] --- Round ${round}/${CONFIG.game.rounds} ---`);
-    logGameEvent({ message: `Round ${round} started` });
-
-    // Log bonus hint tier changes
-    if (round === 6) {
-      console.log('[Game] Bonus hints (tier 1 - vague) now active. Bonus points at 75% value.');
-      logGameEvent({ message: 'Bonus hint tier 1 activated — vague hints, 75% point value', round, hintTier: 1, bonusMultiplier: 0.75 });
-    } else if (round === 9) {
-      console.log('[Game] Bonus hints (tier 2 - specific) now active. Bonus points at 50% value.');
-      logGameEvent({ message: 'Bonus hint tier 2 activated — specific hints, 50% point value', round, hintTier: 2, bonusMultiplier: 0.5 });
-    } else if (round === 12) {
-      console.log('[Game] Bonus hints (tier 3 - explicit) now active. Bonus points at 25% value.');
-      logGameEvent({ message: 'Bonus hint tier 3 activated — explicit hints, 25% point value', round, hintTier: 3, bonusMultiplier: 0.25 });
-    }
-
-    const gameState = {
-      round,
-      networkInfo: this.networkInfo,
-      scores: this.scores,
-      capturedFlags: this.capturedFlags,
-      flagStatus: this.flagStatus,
-    };
-
-    // Determine if we need sequential execution (Ollama can only serve one model at a time)
-    const hasOllama = CONFIG.players.some((p) => p.provider === 'ollama');
-    const hasCloud = CONFIG.players.some((p) => p.provider !== 'ollama' && p.provider !== 'scripted-bot');
-
-    // Phase 1: All defenders act
-    console.log(`[Game] Defenders acting${hasOllama && !hasCloud ? ' (sequential — Ollama)' : ''}...`);
-    if (hasOllama && !hasCloud) {
-      // Sequential: Ollama chokes on concurrent requests for different models
-      for (const player of CONFIG.players) {
-        try {
-          const result = await this.agents[player.id].defender.takeTurn(gameState);
-          console.log(`  [${player.id}/defender] ${result.command || 'SKIP'}`);
-        } catch (err) {
-          console.error(`  [${player.id}/defender] ERROR: ${err.message}`);
-        }
-      }
-    } else {
-      // Parallel: cloud APIs handle concurrency fine
-      const defenderPromises = CONFIG.players.map(async (player) => {
-        try {
-          const result = await this.agents[player.id].defender.takeTurn(gameState);
-          console.log(`  [${player.id}/defender] ${result.command || 'SKIP'}`);
-          return { playerId: player.id, result };
-        } catch (err) {
-          console.error(`  [${player.id}/defender] ERROR: ${err.message}`);
-          return { playerId: player.id, error: err.message };
-        }
-      });
-      await Promise.all(defenderPromises);
-    }
-
-    // Phase 1.5: Internal defenders (segmented mode only)
-    if (CONFIG.game.segmented) {
-      console.log('[Game] Internal defenders acting (sequential)...');
-      for (const player of CONFIG.players) {
-        const agent = this.agents[player.id].internalDefender;
-        if (agent) {
-          try {
-            const result = await agent.takeTurn(gameState);
-            console.log(`  [${player.id}/internal-defender] ${result.command || 'SKIP'}`);
-          } catch (err) {
-            console.error(`  [${player.id}/internal-defender] ERROR: ${err.message}`);
-          }
-        }
-      }
-    }
-
-    // Small delay between phases
-    await sleep(CONFIG.game.turnDelayMs);
-
-    // Phase 2: All attackers act
-    console.log(`[Game] Attackers acting${hasOllama && !hasCloud ? ' (sequential — Ollama)' : ''}...`);
-    if (hasOllama && !hasCloud) {
-      for (const player of CONFIG.players) {
-        try {
-          const result = await this.agents[player.id].attacker.takeTurn(gameState);
-          console.log(`  [${player.id}/attacker] ${result.command || 'SKIP'}`);
-          if (result.flagCaptured && result.result) {
-            this.processCapture(player.id, result.result);
-          }
-        } catch (err) {
-          console.error(`  [${player.id}/attacker] ERROR: ${err.message}`);
-        }
-      }
-    } else {
-      const attackerPromises = CONFIG.players.map(async (player) => {
-        try {
-          const result = await this.agents[player.id].attacker.takeTurn(gameState);
-          console.log(`  [${player.id}/attacker] ${result.command || 'SKIP'}`);
-          if (result.flagCaptured && result.result) {
-            this.processCapture(player.id, result.result);
-          }
-          return { playerId: player.id, result };
-        } catch (err) {
-          console.error(`  [${player.id}/attacker] ERROR: ${err.message}`);
-          return { playerId: player.id, error: err.message };
-        }
-      });
-      await Promise.all(attackerPromises);
-    }
-
-    // Check flag status for all VMs after the round
-    await this.checkAllFlags();
-
-    // Award survival points
-    for (const player of CONFIG.players) {
-      if (!this.flagStatus[player.id]) {
-        this.scores[player.id].total += CONFIG.scoring.flagSurvived;
-        this.scores[player.id].roundsSurvived++;
-      }
-    }
-
-    // Log round summary (deep copy scores to avoid mutation in logs)
-    const scoresSnapshot = {};
-    for (const [id, s] of Object.entries(this.scores)) {
-      scoresSnapshot[id] = { ...s };
-    }
-    logGameEvent({
-      message: `Round ${round} complete`,
-      scores: scoresSnapshot,
-      flagStatus: { ...this.flagStatus },
-    });
-
-    // Delay before next round
-    await sleep(CONFIG.game.turnDelayMs);
   }
 
   /**

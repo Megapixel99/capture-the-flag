@@ -86,7 +86,8 @@
       "Bash(grep -n \"10.20.*\\\\.1$\" /Users/seth/Desktop/temp/coding/CTF/docker/docker-compose.segmented.yml)",
       "Bash(git init:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git checkout:*)"
     ]
   }
 }

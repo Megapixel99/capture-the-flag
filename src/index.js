@@ -89,9 +89,9 @@ async function main() {
   if (isDryRun) {
     console.log('\n[DRY RUN] Validation complete. The following would happen in a real run:');
     console.log('  1. Docker image built with vulnerable Ubuntu 22.04');
-    console.log(`  2. ${CONFIG.players.length} containers started on isolated network (10.10.0.0/24)`);
-    console.log(`  3. ${CONFIG.game.rounds} rounds of attack/defend`);
-    console.log('  4. Each round: defenders act first, then attackers');
+    console.log(`  2. ${CONFIG.players.length} containers started on isolated network`);
+    console.log(`  3. Defense phase: ${CONFIG.game.defensePhaseMinutes} minutes (defenders only)`);
+    console.log(`  4. Battle phase: ${CONFIG.game.battlePhaseMinutes} minutes (attackers + defenders simultaneously)`);
     console.log('  5. Full logs written to', sessionDir);
     console.log('\nConfiguration:');
     console.log(JSON.stringify(CONFIG.game, null, 2));

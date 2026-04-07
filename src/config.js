@@ -142,8 +142,6 @@ function enrichWithSegmented(players) {
 
 const CONFIG = {
   game: {
-    rounds: parseInt(process.env.GAME_ROUNDS || '50', 10),
-    turnDelayMs: parseInt(process.env.TURN_DELAY_SECONDS || '5', 10) * 1000,
     commandTimeoutMs: parseInt(process.env.COMMAND_TIMEOUT_SECONDS || '120', 10) * 1000,
     flagPath: '/root/flag.txt',
     logDir: process.env.LOG_DIR || './logs',
@@ -151,6 +149,9 @@ const CONFIG = {
     localOnly,
     allMode,
     segmented: segmentedMode,
+    // Realtime timing
+    defensePhaseMinutes: parseFloat(process.env.DEFENSE_MINUTES || '3'),
+    battlePhaseMinutes: parseFloat(process.env.BATTLE_MINUTES || '15'),
   },
 
   scoring: {
