@@ -13,8 +13,12 @@ const { CONFIG } = require('../../config.js');
 class OllamaAgent extends BaseAgent {
   constructor(opts) {
     super({ ...opts, provider: 'ollama' });
-    this.model = CONFIG.players.find((p) => p.id === opts.playerId).model;
-    this.baseUrl = CONFIG.api.ollama.baseUrl;
+    const playerConfig = CONFIG.players.find((p) => p.id === opts.playerId);
+    this.model = playerConfig.model;
+    // Each player has its own Ollama instance on a dedicated port
+    this.baseUrl = playerConfig.ollamaPort
+      ? `http://localhost:${playerConfig.ollamaPort}`
+      : CONFIG.api.ollama.baseUrl;
   }
 
   async callModel(messages) {

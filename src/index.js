@@ -117,75 +117,86 @@ async function main() {
     }
   }
 
-  // Pre-pull Ollama models if using local models
+  // Launch Ollama instances for local models — one per model for true parallel execution
   if (CONFIG.game.useLocalModels && !testMode) {
-    console.log('[Ollama] Checking Ollama at', CONFIG.api.ollama.baseUrl, '...');
-    let healthy = await checkOllamaHealth();
-    if (!healthy) {
-      // Try to auto-start Ollama
-      console.log('[Ollama] Not running. Attempting to start automatically...');
-      const { execSync, spawn } = require('child_process');
-      let ollamaPath = null;
-      try {
-        ollamaPath = execSync('which ollama 2>/dev/null', { encoding: 'utf-8' }).trim();
-      } catch {
-        // Check common install locations
-        const candidates = [
-          '/usr/local/bin/ollama',
-          '/opt/homebrew/bin/ollama',
-          '/usr/bin/ollama',
-        ];
-        for (const p of candidates) {
-          try {
-            require('fs').accessSync(p, require('fs').constants.X_OK);
-            ollamaPath = p;
-            break;
-          } catch { /* not found */ }
-        }
-      }
+    const { execSync, spawn } = require('child_process');
+    const axios = require('axios');
+    const ollamaPlayers = CONFIG.players.filter((p) => p.provider === 'ollama');
 
-      if (ollamaPath) {
-        // Start ollama serve in the background
+    // Find ollama binary
+    let ollamaPath = null;
+    try {
+      ollamaPath = execSync('which ollama 2>/dev/null', { encoding: 'utf-8' }).trim();
+    } catch {
+      for (const c of ['/usr/local/bin/ollama', '/opt/homebrew/bin/ollama', '/usr/bin/ollama']) {
+        try { require('fs').accessSync(c, require('fs').constants.X_OK); ollamaPath = c; break; } catch { /* */ }
+      }
+    }
+    if (!ollamaPath) {
+      console.error('[ERROR] Ollama binary not found. Install from https://ollama.com/download');
+      process.exit(1);
+    }
+
+    // Group players by port — each port gets one Ollama instance
+    const portMap = new Map();
+    for (const p of ollamaPlayers) {
+      const port = p.ollamaPort || 11434;
+      if (!portMap.has(port)) portMap.set(port, []);
+      portMap.get(port).push(p);
+    }
+
+    console.log(`[Ollama] Launching ${portMap.size} Ollama instance(s) for ${ollamaPlayers.length} models...`);
+
+    for (const [port, players] of portMap) {
+      const url = `http://localhost:${port}`;
+      let alive = false;
+
+      // Check if already running
+      try {
+        const r = await axios.get(`${url}/api/tags`, { timeout: 2000 });
+        alive = r.status === 200;
+      } catch { /* not running */ }
+
+      if (!alive) {
         const child = spawn(ollamaPath, ['serve'], {
-          detached: true,
-          stdio: 'ignore',
+          detached: true, stdio: 'ignore',
+          env: { ...process.env, OLLAMA_HOST: `0.0.0.0:${port}` },
         });
         child.unref();
-        console.log(`[Ollama] Started "ollama serve" (PID ${child.pid}). Waiting for it to be ready...`);
+        console.log(`[Ollama] Started instance on port ${port} (PID ${child.pid})`);
 
-        // Poll until ready (up to 15 seconds)
         for (let i = 0; i < 15; i++) {
           await new Promise((r) => setTimeout(r, 1000));
-          healthy = await checkOllamaHealth();
-          if (healthy) break;
+          try {
+            const r2 = await axios.get(`${url}/api/tags`, { timeout: 2000 });
+            if (r2.status === 200) { alive = true; break; }
+          } catch { /* retry */ }
+        }
+        if (!alive) { console.error(`[ERROR] Ollama on port ${port} failed to start.`); process.exit(1); }
+      } else {
+        console.log(`[Ollama] Port ${port} already running.`);
+      }
+
+      // Pull and warm each model on this instance
+      for (const player of players) {
+        process.stdout.write(`[Ollama]   Port ${port}: ${player.model}...`);
+        try {
+          const tags = await axios.get(`${url}/api/tags`, { timeout: 5000 });
+          const existing = (tags.data.models || []).map(m => m.name);
+          if (!existing.some(n => n === player.model || n.startsWith(player.model + ':'))) {
+            await axios.post(`${url}/api/pull`, { name: player.model, stream: false }, { timeout: 3600000 });
+          }
+          await axios.post(`${url}/api/chat`, {
+            model: player.model, messages: [{ role: 'user', content: 'hi' }],
+            stream: false, keep_alive: '60m', options: { num_predict: 1 },
+          }, { timeout: 300000 });
+          console.log(' ready');
+        } catch (err) {
+          console.log(` failed (${err.message})`);
         }
       }
-
-      if (!healthy) {
-        console.error('[ERROR] Could not start Ollama automatically.');
-        console.error('');
-        console.error('Install and start Ollama manually:');
-        console.error('  macOS:   Download from https://ollama.com/download');
-        console.error('  Linux:   curl -fsSL https://ollama.com/install.sh | sh');
-        console.error('  Then:    ollama serve');
-        process.exit(1);
-      }
     }
-    console.log('[Ollama] Connected. Pre-pulling models...');
-
-    const ollamaPlayers = CONFIG.players.filter((p) => p.provider === 'ollama');
-    for (const player of ollamaPlayers) {
-      await pullOllamaModel(player.model);
-    }
-    // Pre-warm each model so it's loaded into GPU memory before the game starts
-    console.log('[Ollama] Pre-warming models (loading into memory)...');
-    const uniqueModels = [...new Set(ollamaPlayers.map((p) => p.model))];
-    for (const model of uniqueModels) {
-      process.stdout.write(`[Ollama]   Warming ${model}...`);
-      const ok = await warmModel(model);
-      console.log(ok ? ' ready' : ' failed (will retry during game)');
-    }
-    console.log('[Ollama] All local models ready.\n');
+    console.log(`[Ollama] ${portMap.size} instance(s) ready.\n`);
   }
 
   // Generate setup documentation

@@ -15,6 +15,8 @@ const allMode = process.env.ALL_MODE === 'true' || args.includes('--all');
 const segmentedMode = process.env.SEGMENTED === 'true' || args.includes('--segmented');
 
 // --- Open model definitions (Ollama-served) ---
+// Each model gets its own Ollama instance on a dedicated port for true parallel execution.
+const OLLAMA_BASE_PORT = parseInt(process.env.OLLAMA_BASE_PORT || '11434', 10);
 const OPEN_MODELS = [
   {
     id: 'qwen',
@@ -22,6 +24,7 @@ const OPEN_MODELS = [
     provider: 'ollama',
     container: 'ctf-chatgpt',
     model: process.env.OLLAMA_GPT_MODEL || 'qwen3.5:2b',
+    ollamaPort: OLLAMA_BASE_PORT,
   },
   {
     id: 'gemma',
@@ -29,6 +32,7 @@ const OPEN_MODELS = [
     provider: 'ollama',
     container: 'ctf-gemini',
     model: process.env.OLLAMA_GEMMA_MODEL || 'gemma3:1b',
+    ollamaPort: OLLAMA_BASE_PORT + 1,
   },
   {
     id: 'smollm',
@@ -36,6 +40,7 @@ const OPEN_MODELS = [
     provider: 'ollama',
     container: 'ctf-claude',
     model: process.env.OLLAMA_CLAUDE_MODEL || 'smollm2:1.7b',
+    ollamaPort: OLLAMA_BASE_PORT + 2,
   },
   {
     id: 'granite',
@@ -43,6 +48,7 @@ const OPEN_MODELS = [
     provider: 'ollama',
     container: 'ctf-grok',
     model: process.env.OLLAMA_GROK_MODEL || 'granite3.1-dense:2b',
+    ollamaPort: OLLAMA_BASE_PORT + 3,
   },
   {
     id: 'llama',
@@ -50,6 +56,7 @@ const OPEN_MODELS = [
     provider: 'ollama',
     container: 'ctf-perplexity',
     model: process.env.OLLAMA_PERPLEXITY_MODEL || 'llama3.2:1b',
+    ollamaPort: OLLAMA_BASE_PORT + 4,
   },
 ];
 
