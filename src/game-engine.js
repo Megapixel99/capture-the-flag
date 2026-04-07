@@ -9,6 +9,7 @@ const { ClaudeAgent } = require('./ai-agents/providers/claude.js');
 const { GrokAgent } = require('./ai-agents/providers/grok.js');
 const { PerplexityAgent } = require('./ai-agents/providers/perplexity.js');
 const { OllamaAgent } = require('./ai-agents/providers/ollama.js');
+const { OllamaCloudAgent } = require('./ai-agents/providers/ollama-cloud.js');
 const { ScriptedBotAgent } = require('./ai-agents/providers/scripted-bot.js');
 
 const PROVIDER_MAP = {
@@ -17,6 +18,7 @@ const PROVIDER_MAP = {
   claude: ClaudeAgent,
   grok: GrokAgent,
   perplexity: PerplexityAgent,
+  'ollama-cloud': OllamaCloudAgent,
   ollama: OllamaAgent,
   'scripted-bot': ScriptedBotAgent,
 };
@@ -217,6 +219,43 @@ class GameEngine {
   }
 
   /**
+   * Parallel agent loop: runs a single agent continuously until time expires.
+   * Used when cloud API handles concurrency (no local GPU contention).
+   */
+  async parallelAgentLoop(agent, playerId, role, phaseEndTime) {
+    let loopCount = 0;
+    while (Date.now() < phaseEndTime && !this.gameOver) {
+      loopCount++;
+      const ended = await this.runAgentTurn(agent, playerId, role);
+      if (ended) return;
+      if (loopCount % 10 === 0) flushAll();
+      await sleep(500);
+    }
+  }
+
+  /**
+   * Run agents in the appropriate mode — parallel for cloud, round-robin for local.
+   */
+  async runAgents(agentList, phaseEndTime, phaseName) {
+    const isCloud = CONFIG.game.cloudMode;
+    const loops = [];
+
+    if (isCloud) {
+      // Cloud: true parallel — each agent gets its own concurrent loop
+      for (const { agent, playerId, role } of agentList) {
+        loops.push(this.parallelAgentLoop(agent, playerId, role, phaseEndTime));
+      }
+      console.log(`[Game] Running ${agentList.length} agents in parallel (cloud mode)`);
+    } else {
+      // Local: round-robin — one agent at a time to avoid GPU contention
+      loops.push(this.roundRobinLoop(agentList, phaseEndTime, phaseName));
+    }
+
+    loops.push(this.vulnCheckLoop(phaseEndTime, phaseName));
+    await Promise.all(loops);
+  }
+
+  /**
    * Round-robin loop: cycles through a list of agents one at a time until time expires.
    * Each agent gets one turn, then the next agent goes. This keeps only one model on GPU.
    */
@@ -284,7 +323,7 @@ class GameEngine {
     this.phaseStartTime = Date.now();
     const defenseEnd = Date.now() + defMins * 60 * 1000;
 
-    // Build defender agent list for round-robin
+    // Build defender agent list
     const defenders = [];
     for (const player of CONFIG.players) {
       defenders.push({ agent: this.agents[player.id].defender, playerId: player.id, role: 'defender' });
@@ -292,11 +331,7 @@ class GameEngine {
         defenders.push({ agent: this.agents[player.id].internalDefender, playerId: player.id, role: 'int-defender' });
       }
     }
-    // Run defenders in round-robin + vuln checker in background
-    await Promise.all([
-      this.roundRobinLoop(defenders, defenseEnd, 'defense'),
-      this.vulnCheckLoop(defenseEnd, 'defense'),
-    ]);
+    await this.runAgents(defenders, defenseEnd, 'defense');
 
     if (this.gameOver) {
       this.calculateFinalScores();
@@ -316,7 +351,7 @@ class GameEngine {
     this.phaseStartTime = Date.now();
     const battleEnd = Date.now() + batMins * 60 * 1000;
 
-    // Build full agent list: attackers interleaved with defenders for fair scheduling
+    // Build full agent list: attackers interleaved with defenders
     const battleAgents = [];
     for (const player of CONFIG.players) {
       battleAgents.push({ agent: this.agents[player.id].attacker, playerId: player.id, role: 'attacker' });
@@ -325,11 +360,7 @@ class GameEngine {
         battleAgents.push({ agent: this.agents[player.id].internalDefender, playerId: player.id, role: 'int-defender' });
       }
     }
-    // Run battle in round-robin + vuln checker in background
-    await Promise.all([
-      this.roundRobinLoop(battleAgents, battleEnd, 'battle'),
-      this.vulnCheckLoop(battleEnd, 'battle'),
-    ]);
+    await this.runAgents(battleAgents, battleEnd, 'battle');
 
     // Award survival points — 50 per minute survived (proportional to battle phase length)
     for (const player of CONFIG.players) {

@@ -8,6 +8,7 @@
     "start:local": "node src/index.js --local",
     "start:local-only": "node src/index.js --local-only",
     "start:all": "node src/index.js --all",
+    "start:cloud": "node src/index.js --cloud",
     "start:segmented": "node src/index.js --segmented --local-only",
     "start:segmented-test": "node src/index.js --segmented --test",
     "dry-run": "node src/index.js --dry-run",
@@ -24,6 +25,7 @@
     "axios": "^1.7.0",
     "dockerode": "^4.0.0",
     "dotenv": "^16.4.0",
+    "ollama": "^0.6.3",
     "openai": "^4.73.0"
   }
 }

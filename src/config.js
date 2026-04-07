@@ -14,8 +14,35 @@ const allMode = process.env.ALL_MODE === 'true' || args.includes('--all');
 
 const segmentedMode = process.env.SEGMENTED === 'true' || args.includes('--segmented');
 
-// --- Open model definitions (Ollama-served) ---
-// All models run on a single Ollama instance with OLLAMA_NUM_PARALLEL for concurrent requests.
+// --cloud: use Ollama Cloud API (ollama.com) for hosted inference — no local GPU needed
+const cloudMode = process.env.CLOUD_MODE === 'true' || args.includes('--cloud');
+
+// --- Ollama Cloud model definitions (hosted at ollama.com) ---
+const CLOUD_OLLAMA_MODELS = [
+  {
+    id: 'gemma4',
+    name: 'Gemma 4 (Cloud)',
+    provider: 'ollama-cloud',
+    container: 'ctf-chatgpt',
+    model: process.env.CLOUD_GEMMA_MODEL || 'gemma4',
+  },
+  {
+    id: 'gpt-oss',
+    name: 'GPT-OSS 120B (Cloud)',
+    provider: 'ollama-cloud',
+    container: 'ctf-gemini',
+    model: process.env.CLOUD_GPT_MODEL || 'gpt-oss:120b-cloud',
+  },
+  {
+    id: 'gemini3',
+    name: 'Gemini 3 Flash (Cloud)',
+    provider: 'ollama-cloud',
+    container: 'ctf-claude',
+    model: process.env.CLOUD_GEMINI_MODEL || 'gemini-3-flash-preview:cloud',
+  },
+];
+
+// --- Open model definitions (Ollama-served locally) ---
 const OPEN_MODELS = [
   {
     id: 'qwen',
@@ -95,6 +122,9 @@ const CLOUD_MODELS = [
 
 // --- Build player list based on mode ---
 function buildPlayerList() {
+  if (cloudMode) {
+    return CLOUD_OLLAMA_MODELS;
+  }
   if (allMode) {
     // --all: both cloud and open models — open models get separate containers with "-open" suffix
     const openWithSuffix = OPEN_MODELS.map((p) => ({
@@ -149,6 +179,7 @@ const CONFIG = {
     useLocalModels,
     localOnly,
     allMode,
+    cloudMode,
     segmented: segmentedMode,
     // Realtime timing
     defensePhaseMinutes: parseFloat(process.env.DEFENSE_MINUTES || '10'),
@@ -192,6 +223,9 @@ const CONFIG = {
     },
     ollama: {
       baseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
+    },
+    ollamaCloud: {
+      apiKey: process.env.OLLAMA_API_KEY,
     },
   },
 

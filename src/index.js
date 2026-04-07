@@ -36,7 +36,15 @@ async function main() {
     }
   }
 
-  if (CONFIG.game.segmented && !testMode) {
+  if (CONFIG.game.cloudMode && !testMode) {
+    console.log(`[Mode] CLOUD — ${CONFIG.players.length} models via Ollama Cloud API (ollama.com). True parallel execution.\n`);
+    if (!CONFIG.api.ollamaCloud.apiKey) {
+      console.error('[ERROR] OLLAMA_API_KEY is required for cloud mode.');
+      console.error('Get an API key at https://ollama.com/settings/keys');
+      console.error('Then set it: export OLLAMA_API_KEY=your_key');
+      process.exit(1);
+    }
+  } else if (CONFIG.game.segmented && !testMode) {
     console.log(`[Mode] SEGMENTED — ${CONFIG.players.length} teams, DMZ + Internal zones, lateral movement required\n`);
   } else if (CONFIG.game.allMode && !testMode) {
     console.log(`[Mode] ALL — ${CONFIG.players.length} teams: cloud APIs vs open models side-by-side\n`);
