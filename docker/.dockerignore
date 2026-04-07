@@ -1,0 +1,10 @@
+# Prevent any host source code from being included in Docker build context
+../src
+../node_modules
+../logs
+../.env
+../.env.example
+../package.json
+../package-lock.json
+../set-up.txt
+../.git

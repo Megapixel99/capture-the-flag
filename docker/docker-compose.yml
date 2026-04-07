@@ -1,0 +1,174 @@
+# =============================================================================
+# AI CTF Attack-Defend — Docker Compose
+# =============================================================================
+# Creates 5 isolated containers on a private network with no internet access.
+# Each container runs identical Ubuntu 22.04 with the same vulnerabilities.
+# Ollama runs on a separate network and serves local models (GPT-OSS, Gemma 4).
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # Ollama — Local LLM server (OPTIONAL — for Linux/Windows only)
+  # ---------------------------------------------------------------------------
+  # On macOS, install Ollama natively (brew install ollama) for 25x faster
+  # inference via Apple Silicon GPU. The Docker version runs on CPU only.
+  # On Linux/Windows with NVIDIA GPU, uncomment the deploy section below.
+  # The Node.js orchestrator auto-detects native Ollama at localhost:11434.
+  # ---------------------------------------------------------------------------
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ctf-ollama
+    profiles: ["ollama-docker"]  # Only starts with: docker compose --profile ollama-docker up
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    # Uncomment the following for NVIDIA GPU support (Linux/Windows):
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # CTF Player Containers
+  # ---------------------------------------------------------------------------
+  ctf-chatgpt:
+    build: .
+    container_name: ctf-chatgpt
+    hostname: chatgpt-vm
+    privileged: true
+    cap_add:
+      - ALL
+    networks:
+      ctf-net:
+        ipv4_address: 10.10.0.10
+    restart: unless-stopped
+
+  ctf-gemini:
+    build: .
+    container_name: ctf-gemini
+    hostname: gemini-vm
+    privileged: true
+    cap_add:
+      - ALL
+    networks:
+      ctf-net:
+        ipv4_address: 10.10.0.20
+    restart: unless-stopped
+
+  ctf-claude:
+    build: .
+    container_name: ctf-claude
+    hostname: claude-vm
+    privileged: true
+    cap_add:
+      - ALL
+    networks:
+      ctf-net:
+        ipv4_address: 10.10.0.30
+    restart: unless-stopped
+
+  ctf-grok:
+    build: .
+    container_name: ctf-grok
+    hostname: grok-vm
+    privileged: true
+    cap_add:
+      - ALL
+    networks:
+      ctf-net:
+        ipv4_address: 10.10.0.40
+    restart: unless-stopped
+
+  ctf-perplexity:
+    build: .
+    container_name: ctf-perplexity
+    hostname: perplexity-vm
+    privileged: true
+    cap_add:
+      - ALL
+    networks:
+      ctf-net:
+        ipv4_address: 10.10.0.50
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Open-model duplicate containers (--all mode only)
+  # These run the same vulnerable image but are assigned to open-model AIs.
+  # ---------------------------------------------------------------------------
+  ctf-chatgpt-open:
+    build: .
+    container_name: ctf-chatgpt-open
+    hostname: chatgpt-open-vm
+    privileged: true
+    cap_add:
+      - ALL
+    profiles: ["all"]
+    networks:
+      ctf-net:
+        ipv4_address: 10.10.0.110
+
+  ctf-gemini-open:
+    build: .
+    container_name: ctf-gemini-open
+    hostname: gemini-open-vm
+    privileged: true
+    cap_add:
+      - ALL
+    profiles: ["all"]
+    networks:
+      ctf-net:
+        ipv4_address: 10.10.0.120
+
+  ctf-claude-open:
+    build: .
+    container_name: ctf-claude-open
+    hostname: claude-open-vm
+    privileged: true
+    cap_add:
+      - ALL
+    profiles: ["all"]
+    networks:
+      ctf-net:
+        ipv4_address: 10.10.0.130
+
+  ctf-grok-open:
+    build: .
+    container_name: ctf-grok-open
+    hostname: grok-open-vm
+    privileged: true
+    cap_add:
+      - ALL
+    profiles: ["all"]
+    networks:
+      ctf-net:
+        ipv4_address: 10.10.0.140
+
+  ctf-perplexity-open:
+    build: .
+    container_name: ctf-perplexity-open
+    hostname: perplexity-open-vm
+    privileged: true
+    cap_add:
+      - ALL
+    profiles: ["all"]
+    networks:
+      ctf-net:
+        ipv4_address: 10.10.0.150
+
+volumes:
+  ollama-models:
+    name: ctf-ollama-models
+
+networks:
+  ctf-net:
+    driver: bridge
+    internal: true  # No internet access — containers can only reach each other
+    ipam:
+      config:
+        - subnet: 10.10.0.0/24
+          gateway: 10.10.0.1

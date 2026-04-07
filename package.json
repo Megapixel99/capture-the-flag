@@ -1,0 +1,29 @@
+{
+  "name": "ai-ctf-attack-defend",
+  "version": "1.0.0",
+  "description": "AI Attack-Defend CTF game for academic research — 5 AI models compete in capture-the-flag",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "start:local": "node src/index.js --local",
+    "start:local-only": "node src/index.js --local-only",
+    "start:all": "node src/index.js --all",
+    "start:segmented": "node src/index.js --segmented --local-only",
+    "start:segmented-test": "node src/index.js --segmented --test",
+    "dry-run": "node src/index.js --dry-run",
+    "build-docker": "docker compose -f docker/docker-compose.yml build",
+    "up": "docker compose -f docker/docker-compose.yml up -d",
+    "up:ollama": "docker compose -f docker/docker-compose.yml up -d ollama",
+    "down": "docker compose -f docker/docker-compose.yml down",
+    "test-game": "node src/index.js --test",
+    "logs": "node src/index.js --show-logs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@google/generative-ai": "^0.21.0",
+    "axios": "^1.7.0",
+    "dockerode": "^4.0.0",
+    "dotenv": "^16.4.0",
+    "openai": "^4.73.0"
+  }
+}

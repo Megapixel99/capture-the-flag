@@ -1,0 +1,212 @@
+# =============================================================================
+# AI CTF — Segmented Mode Overlay
+# =============================================================================
+# Usage: docker compose -f docker/docker-compose.yml -f docker/docker-compose.segmented.yml up
+#
+# Adds a DMZ network and per-team internal networks. Each team gets:
+#   - A DMZ container (visible to all teams on the shared DMZ network)
+#   - An internal container (only reachable from that team's DMZ container)
+#
+# The base docker-compose.yml services are NOT used in segmented mode.
+# =============================================================================
+
+networks:
+  ctf-dmz:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 10.30.0.0/24
+          gateway: 10.30.0.1
+
+  ctf-int-1:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 10.20.1.0/24
+
+  ctf-int-2:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 10.20.2.0/24
+
+  ctf-int-3:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 10.20.3.0/24
+
+  ctf-int-4:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 10.20.4.0/24
+
+  ctf-int-5:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 10.20.5.0/24
+
+services:
+  # ---------------------------------------------------------------------------
+  # DMZ Containers — one per team, all on shared ctf-dmz + their team network
+  # ---------------------------------------------------------------------------
+  ctf-chatgpt-dmz:
+    build: .
+    container_name: ctf-chatgpt-dmz
+    hostname: chatgpt-dmz
+    privileged: true
+    cap_add:
+      - ALL
+    environment:
+      CONTAINER_ROLE: dmz
+    networks:
+      ctf-dmz:
+        ipv4_address: 10.30.0.10
+      ctf-int-1:
+        ipv4_address: 10.20.1.3
+    restart: unless-stopped
+
+  ctf-gemini-dmz:
+    build: .
+    container_name: ctf-gemini-dmz
+    hostname: gemini-dmz
+    privileged: true
+    cap_add:
+      - ALL
+    environment:
+      CONTAINER_ROLE: dmz
+    networks:
+      ctf-dmz:
+        ipv4_address: 10.30.0.20
+      ctf-int-2:
+        ipv4_address: 10.20.2.3
+    restart: unless-stopped
+
+  ctf-claude-dmz:
+    build: .
+    container_name: ctf-claude-dmz
+    hostname: claude-dmz
+    privileged: true
+    cap_add:
+      - ALL
+    environment:
+      CONTAINER_ROLE: dmz
+    networks:
+      ctf-dmz:
+        ipv4_address: 10.30.0.30
+      ctf-int-3:
+        ipv4_address: 10.20.3.3
+    restart: unless-stopped
+
+  ctf-grok-dmz:
+    build: .
+    container_name: ctf-grok-dmz
+    hostname: grok-dmz
+    privileged: true
+    cap_add:
+      - ALL
+    environment:
+      CONTAINER_ROLE: dmz
+    networks:
+      ctf-dmz:
+        ipv4_address: 10.30.0.40
+      ctf-int-4:
+        ipv4_address: 10.20.4.3
+    restart: unless-stopped
+
+  ctf-perplexity-dmz:
+    build: .
+    container_name: ctf-perplexity-dmz
+    hostname: perplexity-dmz
+    privileged: true
+    cap_add:
+      - ALL
+    environment:
+      CONTAINER_ROLE: dmz
+    networks:
+      ctf-dmz:
+        ipv4_address: 10.30.0.50
+      ctf-int-5:
+        ipv4_address: 10.20.5.3
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Internal Containers — one per team, ONLY on their team's internal network
+  # ---------------------------------------------------------------------------
+  ctf-chatgpt-internal:
+    build: .
+    container_name: ctf-chatgpt-internal
+    hostname: chatgpt-internal
+    privileged: true
+    cap_add:
+      - ALL
+    environment:
+      CONTAINER_ROLE: internal
+    networks:
+      ctf-int-1:
+        ipv4_address: 10.20.1.2
+    restart: unless-stopped
+
+  ctf-gemini-internal:
+    build: .
+    container_name: ctf-gemini-internal
+    hostname: gemini-internal
+    privileged: true
+    cap_add:
+      - ALL
+    environment:
+      CONTAINER_ROLE: internal
+    networks:
+      ctf-int-2:
+        ipv4_address: 10.20.2.2
+    restart: unless-stopped
+
+  ctf-claude-internal:
+    build: .
+    container_name: ctf-claude-internal
+    hostname: claude-internal
+    privileged: true
+    cap_add:
+      - ALL
+    environment:
+      CONTAINER_ROLE: internal
+    networks:
+      ctf-int-3:
+        ipv4_address: 10.20.3.2
+    restart: unless-stopped
+
+  ctf-grok-internal:
+    build: .
+    container_name: ctf-grok-internal
+    hostname: grok-internal
+    privileged: true
+    cap_add:
+      - ALL
+    environment:
+      CONTAINER_ROLE: internal
+    networks:
+      ctf-int-4:
+        ipv4_address: 10.20.4.2
+    restart: unless-stopped
+
+  ctf-perplexity-internal:
+    build: .
+    container_name: ctf-perplexity-internal
+    hostname: perplexity-internal
+    privileged: true
+    cap_add:
+      - ALL
+    environment:
+      CONTAINER_ROLE: internal
+    networks:
+      ctf-int-5:
+        ipv4_address: 10.20.5.2
+    restart: unless-stopped
