@@ -332,8 +332,8 @@ class GameEngine {
 
     let injectionCount = 0;
     while (Date.now() < phaseEndTime && !this.gameOver) {
-      // Random delay: 2-7 minutes
-      const delayMs = (120 + Math.random() * 300) * 1000;
+      // Random delay: 30-90 seconds
+      const delayMs = (30 + Math.random() * 60) * 1000;
       await sleep(delayMs);
       if (this.gameOver || Date.now() >= phaseEndTime) break;
 
