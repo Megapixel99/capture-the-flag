@@ -1,6 +1,6 @@
 ================================================================================
 AI CTF ATTACK-DEFEND GAME — SETUP & RESEARCH DOCUMENTATION
-Generated: 2026-04-07T17:04:57.114Z
+Generated: 2026-04-07T17:15:03.933Z
 ================================================================================
 
 TABLE OF CONTENTS
@@ -257,22 +257,34 @@ SEGMENTED MODE — INTERNAL SERVER VULNERABILITIES (--segmented):
 6. AI PLAYERS & MODELS
 ================================================================================
 
-Player: Gemma 4 (Cloud)
-  - Provider: ollama-cloud
-  - Model: gemma4:31b
+Player: ChatGPT
+  - Provider: openai
+  - Model: gpt-4o
   - Container: ctf-chatgpt
   - Roles: 1 Attacker + 1 Defender (2 AI instances per VM)
 
-Player: GPT-OSS 120B (Cloud)
-  - Provider: ollama-cloud
-  - Model: gpt-oss:120b
+Player: Gemini
+  - Provider: gemini
+  - Model: gemini-2.5-pro-preview-05-06
   - Container: ctf-gemini
   - Roles: 1 Attacker + 1 Defender (2 AI instances per VM)
 
-Player: Gemini 3 Flash (Cloud)
-  - Provider: ollama-cloud
-  - Model: gemini-3-flash-preview:cloud
+Player: Claude
+  - Provider: claude
+  - Model: claude-sonnet-4-6
   - Container: ctf-claude
+  - Roles: 1 Attacker + 1 Defender (2 AI instances per VM)
+
+Player: Grok
+  - Provider: grok
+  - Model: grok-3
+  - Container: ctf-grok
+  - Roles: 1 Attacker + 1 Defender (2 AI instances per VM)
+
+Player: Perplexity
+  - Provider: perplexity
+  - Model: sonar-pro
+  - Container: ctf-perplexity
   - Roles: 1 Attacker + 1 Defender (2 AI instances per VM)
 
 
