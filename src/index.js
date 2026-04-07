@@ -147,18 +147,12 @@ async function main() {
     } catch { /* not running */ }
 
     if (!alive) {
-      // Start with parallel support — OLLAMA_NUM_PARALLEL allows concurrent model serving
-      const numModels = new Set(ollamaPlayers.map(p => p.model)).size;
       const child = spawn(ollamaPath, ['serve'], {
         detached: true, stdio: 'ignore',
-        env: {
-          ...process.env,
-          OLLAMA_NUM_PARALLEL: String(numModels),
-          OLLAMA_MAX_LOADED_MODELS: String(numModels),
-        },
+        env: { ...process.env },
       });
       child.unref();
-      console.log(`[Ollama] Started (PID ${child.pid}, parallel=${numModels})`);
+      console.log(`[Ollama] Started (PID ${child.pid})`);
 
       for (let i = 0; i < 15; i++) {
         await new Promise((r) => setTimeout(r, 1000));

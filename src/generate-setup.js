@@ -338,14 +338,15 @@ Realtime Game Structure:
   This realtime system mirrors actual cybersecurity operations where
   defenders and attackers operate continuously, not in discrete turns.
 
-Parallel Execution via Ollama:
-  A single Ollama instance serves all models with concurrent request support.
-  The game auto-starts Ollama with OLLAMA_NUM_PARALLEL and OLLAMA_MAX_LOADED_MODELS
-  set to the number of unique models, so all models stay loaded in GPU memory
-  and can serve requests simultaneously.
+Realtime Execution via Ollama:
+  A single Ollama instance serves all models. Requests are processed serially
+  at the GPU level (one inference at a time), but agent loops run concurrently —
+  while one agent's request is being processed, others queue up automatically.
+  With 5-15 second response times per model, agents naturally interleave,
+  giving each model multiple turns per minute.
 
-  All 5 small models fit in ~8GB GPU memory on Apple Silicon (unified memory).
-  Each model is pre-warmed at startup with keep_alive=60m to prevent unloading.
+  Each model is pre-warmed at startup with keep_alive=60m. Ollama swaps models
+  on/off GPU as needed. The small models (~1-3GB each) load in seconds.
 
 Scoring — Main Flags:
   - +${CONFIG.scoring.flagCapturedFirst} points: first attacker to capture a team's main flag
@@ -753,14 +754,12 @@ Hardware Requirements (default small models):
   Response times with GPU (Apple Silicon / NVIDIA): 5-15 seconds per response.
   Response times on CPU only: may exceed 5 minutes — not recommended.
 
-Ollama Parallel Execution:
-  The game auto-starts a single Ollama instance configured for concurrent
-  request handling. Environment variables set at startup:
-    OLLAMA_NUM_PARALLEL=5      — allows 5 concurrent requests
-    OLLAMA_MAX_LOADED_MODELS=5 — keeps all 5 models loaded in GPU memory
+Ollama Configuration:
+  The game auto-starts Ollama if not already running. A single instance
+  serves all models, swapping them on/off GPU as requests arrive. Small
+  models (1-3GB) load onto GPU in seconds, so swapping overhead is minimal.
 
-  All models are pulled and pre-warmed (loaded into GPU) before the game
-  begins. Models are kept loaded with keep_alive=60m.
+  All models are pulled and pre-warmed at startup with keep_alive=60m.
 
   Default models and sizes:
     qwen3.5:2b          (2.7 GB)
@@ -768,10 +767,8 @@ Ollama Parallel Execution:
     smollm2:1.7b        (1.8 GB)
     granite3.1-dense:2b (1.6 GB)
     llama3.2:1b         (1.3 GB)
-    Total GPU memory:   ~8.2 GB
 
-  If Ollama is already running, it is reused (not restarted). The existing
-  instance must have enough parallel capacity for all models.
+  If Ollama is already running, it is reused (not restarted).
 
 Running with Local Models (hybrid — 2 local + 3 API):
   1. Install Ollama natively (see above)
