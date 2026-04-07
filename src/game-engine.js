@@ -205,7 +205,7 @@ class GameEngine {
 
       if (role === 'attacker' && result.flagCaptured && result.result) {
         this.processCapture(playerId, result.result);
-        if (this.shouldEndGame()) {
+        if (!CONFIG.game.cloudMode && this.shouldEndGame()) {
           const survivor = this.getLastSurvivor();
           console.log(`\n[Game] === GAME OVER — only ${survivor} has an uncaptured flag! ===\n`);
           logGameEvent({ message: `Game ended early — ${survivor} is the last team standing`, survivor });
