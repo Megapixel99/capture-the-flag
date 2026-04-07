@@ -357,6 +357,15 @@ class GameEngine {
           description: vuln.description,
           elapsedSeconds: elapsed,
         });
+
+        // Alert the affected defender with a vague warning
+        const defender = this.agents[player.id]?.defender;
+        if (defender) {
+          defender.conversationHistory.push({
+            role: 'user',
+            content: 'SECURITY ALERT: Anomalous activity detected on your machine. Something may have changed. Investigate immediately.',
+          });
+        }
       } catch (err) {
         // Injection failed (container down, etc.) — skip silently
       }
