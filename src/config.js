@@ -38,7 +38,7 @@ const CLOUD_OLLAMA_MODELS = [
     name: 'Gemini 3 Flash (Cloud)',
     provider: 'ollama-cloud',
     container: 'ctf-claude',
-    model: process.env.CLOUD_GEMINI_MODEL || 'gemini-3-flash-preview',
+    model: process.env.CLOUD_GEMINI_MODEL || 'gemini-3-flash-preview:cloud',
   },
 ];
 
