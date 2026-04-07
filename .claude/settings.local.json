@@ -104,7 +104,10 @@
       "Bash(node -e \"process.stdin.on\\(''''data'''',d=>{const m=JSON.parse\\(d\\).models||[];if\\(!m.length\\){console.log\\(''''No models loaded''''\\)}else{m.forEach\\(x=>console.log\\(x.name,''''VRAM:''''+Math.round\\(x.size_vram/1e9\\)+''''GB'''',''''expires:''''+x.expires_at\\)\\)}}\\)\")",
       "Bash(node src/index.js --dry-run --cloud)",
       "Bash(node src/index.js --dry-run --cloud --test)",
-      "Bash(node src/index.js --dry-run --test --cloud)"
+      "Bash(node src/index.js --dry-run --test --cloud)",
+      "Bash(/usr/local/Cellar/python@3.13/3.13.5/bin/python3.13 -m pip install python-docx --break-system-packages)",
+      "Bash(/usr/local/Cellar/python@3.13/3.13.5/bin/python3.13 /Users/seth/Desktop/temp/coding/CTF/reports/generate_docx_reports.py)",
+      "Bash(ls -la /Users/seth/Desktop/temp/coding/CTF/reports/*.docx)"
     ]
   }
 }

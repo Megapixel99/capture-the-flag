@@ -1,6 +1,6 @@
 ================================================================================
 AI CTF ATTACK-DEFEND GAME — SETUP & RESEARCH DOCUMENTATION
-Generated: 2026-04-07T17:49:08.067Z
+Generated: 2026-04-07T21:12:50.919Z
 ================================================================================
 
 TABLE OF CONTENTS
@@ -257,9 +257,9 @@ SEGMENTED MODE — INTERNAL SERVER VULNERABILITIES (--segmented):
 6. AI PLAYERS & MODELS
 ================================================================================
 
-Player: Gemma 4 (Cloud)
+Player: GLM-5.1 (Cloud)
   - Provider: ollama-cloud
-  - Model: gemma4:31b
+  - Model: glm-5.1:cloud
   - Container: ctf-chatgpt
   - Roles: 1 Attacker + 1 Defender (2 AI instances per VM)
 

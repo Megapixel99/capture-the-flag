@@ -20,11 +20,11 @@ const cloudMode = process.env.CLOUD_MODE === 'true' || args.includes('--cloud');
 // --- Ollama Cloud model definitions (hosted at ollama.com) ---
 const CLOUD_OLLAMA_MODELS = [
   {
-    id: 'gemma4',
-    name: 'Gemma 4 (Cloud)',
+    id: 'glm5',
+    name: 'GLM-5.1 (Cloud)',
     provider: 'ollama-cloud',
     container: 'ctf-chatgpt',
-    model: process.env.CLOUD_GEMMA_MODEL || 'gemma4:31b',
+    model: process.env.CLOUD_GLM_MODEL || 'glm-5.1:cloud',
   },
   {
     id: 'gpt-oss',
