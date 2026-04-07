@@ -24,21 +24,21 @@ const CLOUD_OLLAMA_MODELS = [
     name: 'Gemma 4 (Cloud)',
     provider: 'ollama-cloud',
     container: 'ctf-chatgpt',
-    model: process.env.CLOUD_GEMMA_MODEL || 'gemma4',
+    model: process.env.CLOUD_GEMMA_MODEL || 'gemma4:31b',
   },
   {
     id: 'gpt-oss',
     name: 'GPT-OSS 120B (Cloud)',
     provider: 'ollama-cloud',
     container: 'ctf-gemini',
-    model: process.env.CLOUD_GPT_MODEL || 'gpt-oss:120b-cloud',
+    model: process.env.CLOUD_GPT_MODEL || 'gpt-oss:120b',
   },
   {
     id: 'gemini3',
     name: 'Gemini 3 Flash (Cloud)',
     provider: 'ollama-cloud',
     container: 'ctf-claude',
-    model: process.env.CLOUD_GEMINI_MODEL || 'gemini-3-flash-preview:cloud',
+    model: process.env.CLOUD_GEMINI_MODEL || 'gemini-3-flash-preview',
   },
 ];
 
