@@ -22,21 +22,38 @@ class OllamaCloudAgent extends BaseAgent {
   }
 
   async callModel(messages) {
-    const response = await this.client.chat({
-      model: this.model,
-      messages,
-      stream: false,
-      options: {
-        temperature: 0.7,
-        num_predict: 2048,
-      },
-    });
+    const maxRetries = 3;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await this.client.chat({
+          model: this.model,
+          messages,
+          stream: false,
+          options: {
+            temperature: 0.7,
+            num_predict: 2048,
+          },
+        });
 
-    return {
-      text: response.message?.content || '',
-      thinking: '',
-      tokensUsed: (response.prompt_eval_count || 0) + (response.eval_count || 0),
-    };
+        return {
+          text: response.message?.content || '',
+          thinking: '',
+          tokensUsed: (response.prompt_eval_count || 0) + (response.eval_count || 0),
+        };
+      } catch (err) {
+        const status = err.status_code || err.status || err.response?.status;
+        const msg = err.message || '';
+        const isRateLimit = status === 429 || msg.includes('rate limit') || msg.includes('capacity');
+
+        if (isRateLimit && attempt < maxRetries) {
+          // Wait 60 seconds and retry
+          console.log(`  [${this.playerId}/${this.role}] Rate limited — waiting 60s (attempt ${attempt}/${maxRetries})`);
+          await new Promise(r => setTimeout(r, 60000));
+          continue;
+        }
+        throw err;
+      }
+    }
   }
 }
 

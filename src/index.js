@@ -44,6 +44,45 @@ async function main() {
       console.error('Then set it: export OLLAMA_API_KEY=your_key');
       process.exit(1);
     }
+
+    // Pre-flight usage check — make a tiny test request to verify API access and capacity
+    const { Ollama } = require('ollama');
+    const testClient = new Ollama({
+      host: 'https://ollama.com',
+      headers: { Authorization: 'Bearer ' + CONFIG.api.ollamaCloud.apiKey },
+    });
+
+    let ready = false;
+    while (!ready) {
+      console.log('[Cloud] Checking API availability...');
+      try {
+        await testClient.chat({
+          model: CONFIG.players[0].model,
+          messages: [{ role: 'user', content: 'hi' }],
+          stream: false,
+          options: { num_predict: 1 },
+        });
+        console.log('[Cloud] API is available.\n');
+        ready = true;
+      } catch (err) {
+        const status = err.status_code || err.status || err.response?.status;
+        const msg = err.message || '';
+
+        if (status === 429 || msg.includes('rate limit') || msg.includes('capacity') || msg.includes('queue is full')) {
+          console.log('[Cloud] API is at capacity (rate limited).');
+          console.log('[Cloud] Waiting 30 minutes before retrying... (Ctrl+C to cancel)');
+          logGameEvent({ message: 'Cloud API at capacity — waiting 30 minutes', error: msg });
+          await new Promise(r => setTimeout(r, 30 * 60 * 1000));
+        } else if (status === 401 || msg.includes('unauthorized') || msg.includes('invalid')) {
+          console.error('[ERROR] Invalid OLLAMA_API_KEY. Check your key at https://ollama.com/settings/keys');
+          process.exit(1);
+        } else {
+          console.error(`[Cloud] API check failed: ${msg}`);
+          console.log('[Cloud] Waiting 30 minutes before retrying... (Ctrl+C to cancel)');
+          await new Promise(r => setTimeout(r, 30 * 60 * 1000));
+        }
+      }
+    }
   } else if (CONFIG.game.segmented && !testMode) {
     console.log(`[Mode] SEGMENTED — ${CONFIG.players.length} teams, DMZ + Internal zones, lateral movement required\n`);
   } else if (CONFIG.game.allMode && !testMode) {
