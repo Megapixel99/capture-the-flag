@@ -1,6 +1,6 @@
 const { CONFIG } = require('./config.js');
 const { readFlag, getNetworkInfo, execCommand } = require('./docker-manager.js');
-const { logGameEvent, logScoreboard } = require('./logger.js');
+const { logGameEvent, logScoreboard, flushAll } = require('./logger.js');
 const { getAttackerSystemPrompt, getSegmentedAttackerSystemPrompt } = require('./ai-agents/attacker.js');
 const { getDefenderSystemPrompt, getSegmentedDefenderSystemPrompt, getInternalDefenderSystemPrompt } = require('./ai-agents/defender.js');
 const { OpenAIAgent } = require('./ai-agents/providers/openai.js');
@@ -191,7 +191,9 @@ class GameEngine {
    * Run a single agent in a loop until the phase ends or game is over.
    */
   async agentLoop(agent, playerId, role, phaseEndTime) {
+    let loopCount = 0;
     while (Date.now() < phaseEndTime && !this.gameOver) {
+      loopCount++;
       try {
         const gameState = this.buildGameState();
         const result = await agent.takeTurn(gameState);
@@ -217,6 +219,9 @@ class GameEngine {
       } catch (err) {
         console.error(`  [${playerId}/${role}] ERROR: ${err.message}`);
       }
+
+      // Flush logs periodically so they're available even if game is interrupted
+      if (loopCount % 10 === 0) flushAll();
 
       // Small breather to prevent hammering Ollama
       await sleep(500);

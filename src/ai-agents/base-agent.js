@@ -17,6 +17,7 @@ class BaseAgent {
     this.turnCount = 0;
     this.ownFlag = null; // Set by game engine after reading flags
     this.recentCommands = []; // Track last N commands for loop detection
+    this.auditCount = 0; // Track how many auto-audits have been triggered
   }
 
   /**
@@ -84,8 +85,18 @@ class BaseAgent {
       const cmd = parsed.command.toLowerCase();
       const isIdle = cmd.startsWith('echo ') && !cmd.includes('chpasswd') && !cmd.includes('|') && !cmd.includes('>');
       if (isIdle) {
-        parsed.thinking = `[AUTO-AUDIT] Defender issued idle echo command: "${parsed.command}". Replacing with automated security audit.`;
-        parsed.command = AUDIT_COMMAND;
+        this.auditCount++;
+        if (this.auditCount <= 3) {
+          parsed.thinking = `[AUTO-AUDIT #${this.auditCount}] Defender issued idle echo command: "${parsed.command}". Replacing with automated security audit.`;
+          parsed.command = AUDIT_COMMAND;
+        } else {
+          // After 3 audits, just skip — defender has nothing useful to do
+          parsed.thinking = `[IDLE] Defender keeps echoing status. Skipping (audit limit reached).`;
+          parsed.command = 'SKIP';
+        }
+      } else {
+        // Reset audit counter when defender does something real
+        this.auditCount = 0;
       }
     }
 
