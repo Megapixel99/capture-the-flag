@@ -644,10 +644,12 @@ Test Mode (no API keys required):
 
 Useful Commands:
   Cloud (recommended — full-size models, true parallel execution):
-  - npm run start:cloud          # 3 models via Ollama Cloud (glm-5.1, gpt-oss, gemini3)
+  - npm run start:cloud          # Single game via Ollama Cloud
+  - npm run start:cloud:loop     # Continuous games — auto-restarts after each
 
   Local (small models, no API costs):
-  - npm run start:local-only     # 5 open models via local Ollama — zero API keys
+  - npm run start:local-only     # Single game, 5 open models via local Ollama
+  - npm run start:local-only:loop # Continuous local games
   - npm run start:local          # Hybrid: 2 local + 3 cloud API
 
   Vendor APIs:
@@ -847,9 +849,33 @@ Running Cloud (Ollama Cloud API — full-size models, true parallel):
   - Mid-game vulnerability injection keeps the game dynamic
 
   Usage:
-    npm run start:cloud                                             # Default timing
+    npm run start:cloud                                             # Single game
+    npm run start:cloud:loop                                        # Continuous games
     DEFENSE_MINUTES=1 BATTLE_MINUTES=10 npm run start:cloud         # Longer game
-    node src/index.js --test --local-only         # Test with scripted bots, 5 open players
+
+Continuous Mode (--loop):
+  Add --loop to any run command to play games back-to-back automatically.
+  After each game completes, the system:
+    1. Saves the session logs
+    2. Stops and destroys all containers
+    3. Recreates fresh containers from the Docker image (all original
+       vulnerabilities are restored — no patches carry over between games)
+    4. Waits 5 seconds, then starts the next game
+
+  This ensures each game is a clean slate — defenders must re-discover and
+  re-fix all vulnerabilities, and attackers always face unpatched machines.
+
+  The loop stops automatically when:
+    - The Ollama Cloud API rate limit is hit (incomplete session is deleted)
+    - Ctrl+C is pressed (graceful shutdown)
+    - A fatal container error cannot be recovered
+
+  If a container dies mid-game (HTTP 409 error), the loop automatically
+  restarts the containers and continues with the next game.
+
+  Flag integrity: /root/flag.txt is made immutable (chattr +i) at container
+  startup. Even root cannot modify or delete it, preventing AI defenders
+  from replacing the flag with a random value to "protect" it.
 
 Running All (10 teams — cloud vs open, side-by-side):
   Run "npm run start:all" for the full research setup: 5 cloud API players
