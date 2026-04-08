@@ -40,6 +40,13 @@ const CLOUD_OLLAMA_MODELS = [
     container: 'ctf-claude',
     model: process.env.CLOUD_GEMINI_MODEL || 'gemini-3-flash-preview:cloud',
   },
+  {
+    id: 'nemotron',
+    name: 'Nemotron 3 Super (Cloud)',
+    provider: 'ollama-cloud',
+    container: 'ctf-grok',
+    model: process.env.CLOUD_NEMOTRON_MODEL || 'nemotron-3-super:cloud',
+  },
 ];
 
 // --- Open model definitions (Ollama-served locally) ---

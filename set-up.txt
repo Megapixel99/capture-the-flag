@@ -1,6 +1,6 @@
 ================================================================================
 AI CTF ATTACK-DEFEND GAME — SETUP & RESEARCH DOCUMENTATION
-Generated: 2026-04-08T15:25:45.424Z
+Generated: 2026-04-08T15:30:03.107Z
 ================================================================================
 
 TABLE OF CONTENTS
@@ -273,6 +273,12 @@ Player: Gemini 3 Flash (Cloud)
   - Provider: ollama-cloud
   - Model: gemini-3-flash-preview:cloud
   - Container: ctf-claude
+  - Roles: 1 Attacker + 1 Defender (2 AI instances per VM)
+
+Player: Nemotron 3 Super (Cloud)
+  - Provider: ollama-cloud
+  - Model: nemotron-3-super:cloud
+  - Container: ctf-grok
   - Roles: 1 Attacker + 1 Defender (2 AI instances per VM)
 
 
