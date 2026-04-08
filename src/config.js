@@ -47,6 +47,13 @@ const CLOUD_OLLAMA_MODELS = [
     container: 'ctf-grok',
     model: process.env.CLOUD_NEMOTRON_MODEL || 'nemotron-3-super:cloud',
   },
+  {
+    id: 'rnj',
+    name: 'RNJ-1 8B (Cloud)',
+    provider: 'ollama-cloud',
+    container: 'ctf-perplexity',
+    model: process.env.CLOUD_RNJ_MODEL || 'rnj-1:8b-cloud',
+  },
 ];
 
 // --- Open model definitions (Ollama-served locally) ---
