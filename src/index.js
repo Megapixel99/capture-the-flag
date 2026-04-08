@@ -236,57 +236,70 @@ async function main() {
     console.log(`[Ollama] All models ready.\n`);
   }
 
-  // Generate setup documentation
-  await generateSetupDoc(sessionDir);
+  // --- Game loop (runs once normally, repeats with --loop) ---
+  const loopMode = process.argv.includes('--loop');
+  let gameNumber = 0;
 
-  // Create and initialize game engine
-  const engine = new GameEngine({ testMode });
+  while (true) {
+    gameNumber++;
+    if (loopMode && gameNumber > 1) {
+      console.log(`\n${'='.repeat(60)}`);
+      console.log(`[Main] Starting game #${gameNumber}...`);
+      console.log('='.repeat(60));
+    }
 
-  try {
-    await engine.initialize();
+    // Fresh session for each game
+    const gameSessionDir = initSession();
+    console.log(`[Main] Log directory: ${gameSessionDir}`);
+    await generateSetupDoc(gameSessionDir);
 
-    logGameEvent({
-      message: 'Game starting',
-      config: CONFIG.game,
-      players: CONFIG.players.map((p) => ({ id: p.id, model: p.model, container: p.container })),
-    });
+    const engine = new GameEngine({ testMode });
 
-    // Run the game
-    const finalScores = await engine.runGame();
+    try {
+      await engine.initialize();
 
-    // If rate limited, delete the incomplete session and stop
-    if (engine.rateLimited) {
-      console.log('[Main] Game interrupted by rate limiting — deleting incomplete session.');
-      try {
-        const { rmSync } = require('fs');
-        rmSync(sessionDir, { recursive: true, force: true });
-        console.log(`[Main] Deleted: ${sessionDir}`);
-      } catch (e) {
-        console.error(`[Main] Failed to delete session: ${e.message}`);
+      logGameEvent({
+        message: `Game #${gameNumber} starting`,
+        config: CONFIG.game,
+        players: CONFIG.players.map((p) => ({ id: p.id, model: p.model, container: p.container })),
+        gameNumber,
+      });
+
+      const finalScores = await engine.runGame();
+
+      // Rate limited — delete incomplete session and stop looping
+      if (engine.rateLimited) {
+        console.log('[Main] Game interrupted by rate limiting — deleting incomplete session.');
+        try {
+          const { rmSync } = require('fs');
+          rmSync(gameSessionDir, { recursive: true, force: true });
+          console.log(`[Main] Deleted: ${gameSessionDir}`);
+        } catch (e) {
+          console.error(`[Main] Failed to delete session: ${e.message}`);
+        }
+        await stopContainers();
+        process.exit(1);
       }
-      await stopContainers();
-      process.exit(1);
+
+      console.log(`\n[Main] Game #${gameNumber} complete! Logs saved to: ${gameSessionDir}`);
+
+    } catch (err) {
+      console.error('[FATAL]', err);
+      logGameEvent({ message: `Fatal error: ${err.message}`, stack: err.stack });
     }
 
-    console.log('\n[Main] Game complete! Logs saved to:', sessionDir);
-    console.log('[Main] Files generated:');
-    console.log('  - game.json (all events)');
-    console.log('  - events.log (human-readable)');
-    for (const p of CONFIG.players) {
-      console.log(`  - ${p.id}-attacker.json`);
-      console.log(`  - ${p.id}-defender.json`);
+    // If not looping, exit after one game
+    if (!loopMode) {
+      if (!skipDocker) {
+        console.log('\n[Main] Game finished. Containers are still running for inspection.');
+        console.log('[Main] Run `npm run down` to stop and remove containers.');
+      }
+      break;
     }
 
-    return finalScores;
-  } catch (err) {
-    console.error('[FATAL]', err);
-    logGameEvent({ message: `Fatal error: ${err.message}`, stack: err.stack });
-  } finally {
-    // Ask before stopping containers so user can inspect state
-    if (!skipDocker) {
-      console.log('\n[Main] Game finished. Containers are still running for inspection.');
-      console.log('[Main] Run `npm run down` to stop and remove containers.');
-    }
+    // Brief pause between games
+    console.log('\n[Main] Starting next game in 5 seconds... (Ctrl+C to stop)');
+    await new Promise(r => setTimeout(r, 5000));
   }
 }
 

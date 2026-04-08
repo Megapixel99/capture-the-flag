@@ -9,6 +9,8 @@
     "start:local-only": "node src/index.js --local-only",
     "start:all": "node src/index.js --all",
     "start:cloud": "node src/index.js --cloud",
+    "start:cloud:loop": "node src/index.js --cloud --loop",
+    "start:local-only:loop": "node src/index.js --local-only --loop",
     "start:segmented": "node src/index.js --segmented --local-only",
     "start:segmented-test": "node src/index.js --segmented --test",
     "dry-run": "node src/index.js --dry-run",
