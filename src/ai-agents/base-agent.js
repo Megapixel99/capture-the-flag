@@ -217,11 +217,24 @@ class BaseAgent {
       }
 
       // Nudge struggling attackers
+      const elapsed = gameState.elapsedSeconds || this.turnCount * 30;
       if (myCaptured.length === 0 && this.turnCount >= 5) {
-        parts.push('\nWARNING: You have not captured any flags yet! Remember:');
-        parts.push('- Use curl to attack the web service: curl -s "http://TARGET_IP:8080/ping?host=;cat+/root/flag.txt"');
-        parts.push('- Use sshpass for SSH: sshpass -p "toor" ssh -o StrictHostKeyChecking=no root@TARGET_IP "cat /root/flag.txt"');
-        parts.push('- Replace TARGET_IP with an actual IP address from the target list above.');
+        parts.push('\nWARNING: You have not captured any flags yet! The defenders are hardening fast.');
+        parts.push('Try different attack vectors — if one method was patched, try another:');
+        parts.push('- Web service command injection on port 8080');
+        parts.push('- SSH with common credentials');
+        parts.push('- Look for SUID binaries, writable cron jobs, readable config files');
+        parts.push('- Check if defenders left any backup files or new services exposed');
+      }
+      // Push attackers to escalate after initial captures
+      if (myCaptured.length > 0 && elapsed > 120) {
+        const uncaptured = Object.keys(gameState.networkInfo || {}).filter(
+          id => id !== this.playerId && !myCaptured.includes(id)
+        );
+        if (uncaptured.length > 0) {
+          parts.push(`\nYou still need flags from: ${uncaptured.join(', ')}. Defenders may have patched earlier vectors.`);
+          parts.push('Try: scanning for new services, checking if vulns were re-introduced, exploiting backup files, or pivoting through compromised machines.');
+        }
       }
     }
 

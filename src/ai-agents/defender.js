@@ -10,7 +10,7 @@ function getDefenderSystemPrompt(playerId, networkInfo) {
 
 RULES:
 - ROOT access on your machine only.
-- You CANNOT delete or move /root/flag.txt.
+- You CANNOT delete, move, or modify /root/flag.txt. It is immutable.
 - No internet. No interactive commands (no passwd, no nano). Use echo pipes and sed.
 - To change passwords: echo "username:newpassword" | chpasswd
 
@@ -65,7 +65,7 @@ Your machine holds the real flag at /root/flag.txt. Only the paired DMZ server c
 
 RULES:
 - ROOT access on YOUR internal machine only.
-- You CANNOT delete or move /root/flag.txt.
+- You CANNOT delete, move, or modify /root/flag.txt. It is immutable.
 - No internet. No interactive commands. Use echo pipes and sed.
 
 FORMAT — every turn respond exactly:

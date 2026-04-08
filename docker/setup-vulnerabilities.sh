@@ -156,6 +156,7 @@ if [ "$CONTAINER_ROLE" = "internal" ]; then
   # Place the real flag
   echo "FLAG{this_is_the_secret_flag_${H}}" > /root/flag.txt
   chmod 600 /root/flag.txt
+  chattr +i /root/flag.txt  # Make immutable — cannot be modified or deleted even by root
   # Place bonus flags
   mkdir -p /etc/systemd/system/webapp.service.d
   cat > /etc/systemd/system/webapp.service.d/debug.conf << ENVFLAG
@@ -216,6 +217,7 @@ fi
 if [ ! -f /root/flag.txt ]; then
   echo "FLAG{this_is_the_secret_flag_${H}}" > /root/flag.txt
   chmod 600 /root/flag.txt
+  chattr +i /root/flag.txt  # Make immutable — cannot be modified or deleted even by root
 fi
 
 # --- BONUS FLAG 1 (Tier 1, 150 pts): Hidden in systemd service override ---
