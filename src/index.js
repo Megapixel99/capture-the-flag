@@ -1,5 +1,5 @@
 const { CONFIG } = require('./config.js');
-const { buildImage, startContainers, stopContainers } = require('./docker-manager.js');
+const { buildImage, startContainers, stopContainers, resetContainers } = require('./docker-manager.js');
 const { initSession, logGameEvent, getSessionDir } = require('./logger.js');
 const { GameEngine } = require('./game-engine.js');
 const { generateSetupDoc } = require('./generate-setup.js');
@@ -319,15 +319,16 @@ async function main() {
       break;
     }
 
-    // Reset containers between games so each starts with fresh vulnerabilities
-    console.log('\n[Main] Resetting containers for next game...');
+    // Reset containers between games — force-recreate without rebuilding the image
     try {
-      await stopContainers();
-      await startContainers();
-      console.log('[Main] Containers reset. Starting next game in 5 seconds... (Ctrl+C to stop)');
+      await resetContainers();
+      console.log('[Main] Starting next game in 5 seconds... (Ctrl+C to stop)');
     } catch (restartErr) {
-      console.error('[FATAL] Could not reset containers:', restartErr.message);
-      process.exit(1);
+      console.error('[Main] Reset failed, trying full restart...');
+      try { await stopContainers(); await startContainers(); } catch (e) {
+        console.error('[FATAL] Could not restart containers:', e.message);
+        process.exit(1);
+      }
     }
     await new Promise(r => setTimeout(r, 5000));
   }

@@ -56,6 +56,7 @@ async function startContainers() {
   execSync(`docker compose ${composeFiles} ${profileFlag} up -d --build ${serviceArgs}`, {
     stdio: 'inherit',
     cwd: process.cwd(),
+    timeout: 120000,
   });
 
   // Wait for containers to be healthy
@@ -168,6 +169,7 @@ async function stopContainers() {
     execSync(`docker compose ${composeFiles} down`, {
       stdio: 'inherit',
       cwd: process.cwd(),
+      timeout: 60000,
     });
   } catch (e) {
     console.error('[Docker] Error stopping containers:', e.message);
@@ -215,4 +217,45 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-module.exports = { buildImage, startContainers, execCommand, readFlag, stopContainers, getNetworkInfo };
+/**
+ * Reset containers between loop games — destroy and recreate without rebuilding the image.
+ * Much faster than startContainers() which runs --build.
+ */
+async function resetContainers() {
+  console.log('[Docker] Resetting containers (no rebuild)...');
+  const composeFiles = CONFIG.game.segmented
+    ? '-f docker/docker-compose.yml -f docker/docker-compose.segmented.yml'
+    : '-f docker/docker-compose.yml';
+
+  const services = CONFIG.game.segmented
+    ? [...new Set(CONFIG.players.flatMap(p => [p.dmzContainer, p.internalContainer]))]
+    : [...new Set(CONFIG.players.map(p => p.container))];
+  const serviceArgs = services.join(' ');
+
+  const needsAllProfile = services.some(s => s.endsWith('-open'));
+  const profileFlag = needsAllProfile ? '--profile all' : '';
+
+  // Force recreate containers (destroys old, creates new from existing image)
+  execSync(`docker compose ${composeFiles} ${profileFlag} up -d --force-recreate ${serviceArgs}`, {
+    stdio: 'inherit',
+    cwd: process.cwd(),
+    timeout: 60000,
+  });
+
+  console.log('[Docker] Waiting for containers to initialize...');
+  await sleep(5000);
+
+  // Quick verify
+  for (const svc of services) {
+    try {
+      const c = docker.getContainer(svc);
+      const info = await c.inspect();
+      if (!info.State.Running) throw new Error(`${svc} not running`);
+    } catch (err) {
+      console.error(`[Docker] ${svc}: ${err.message}`);
+    }
+  }
+  console.log('[Docker] Containers reset.');
+}
+
+module.exports = { buildImage, startContainers, execCommand, readFlag, stopContainers, resetContainers, getNetworkInfo };
