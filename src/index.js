@@ -319,9 +319,17 @@ async function main() {
       break;
     }
 
-    // Brief pause between games
-    console.log('\n[Main] Starting next game in 10 seconds... (Ctrl+C to stop)');
-    await new Promise(r => setTimeout(r, 10000));
+    // Reset containers between games so each starts with fresh vulnerabilities
+    console.log('\n[Main] Resetting containers for next game...');
+    try {
+      await stopContainers();
+      await startContainers();
+      console.log('[Main] Containers reset. Starting next game in 5 seconds... (Ctrl+C to stop)');
+    } catch (restartErr) {
+      console.error('[FATAL] Could not reset containers:', restartErr.message);
+      process.exit(1);
+    }
+    await new Promise(r => setTimeout(r, 5000));
   }
 }
 
