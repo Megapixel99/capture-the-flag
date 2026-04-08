@@ -284,8 +284,30 @@ async function main() {
       console.log(`\n[Main] Game #${gameNumber} complete! Logs saved to: ${gameSessionDir}`);
 
     } catch (err) {
-      console.error('[FATAL]', err);
-      logGameEvent({ message: `Fatal error: ${err.message}`, stack: err.stack });
+      console.error('[FATAL]', err.message || err);
+
+      // Delete the failed session folder
+      try {
+        const { rmSync } = require('fs');
+        rmSync(gameSessionDir, { recursive: true, force: true });
+      } catch { /* ignore */ }
+
+      if (!loopMode) {
+        process.exit(1);
+      }
+
+      // In loop mode, check if it's a container error — restart containers
+      const errMsg = (err.message || '').toLowerCase();
+      if (errMsg.includes('not running') || errMsg.includes('409') || errMsg.includes('container')) {
+        console.log('[Main] Container error detected — restarting containers...');
+        try {
+          await startContainers();
+          console.log('[Main] Containers restarted.');
+        } catch (restartErr) {
+          console.error('[FATAL] Could not restart containers:', restartErr.message);
+          process.exit(1);
+        }
+      }
     }
 
     // If not looping, exit after one game
@@ -298,8 +320,8 @@ async function main() {
     }
 
     // Brief pause between games
-    console.log('\n[Main] Starting next game in 5 seconds... (Ctrl+C to stop)');
-    await new Promise(r => setTimeout(r, 5000));
+    console.log('\n[Main] Starting next game in 10 seconds... (Ctrl+C to stop)');
+    await new Promise(r => setTimeout(r, 10000));
   }
 }
 

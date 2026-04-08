@@ -107,7 +107,9 @@
       "Bash(node src/index.js --dry-run --test --cloud)",
       "Bash(/usr/local/Cellar/python@3.13/3.13.5/bin/python3.13 -m pip install python-docx --break-system-packages)",
       "Bash(/usr/local/Cellar/python@3.13/3.13.5/bin/python3.13 /Users/seth/Desktop/temp/coding/CTF/reports/generate_docx_reports.py)",
-      "Bash(ls -la /Users/seth/Desktop/temp/coding/CTF/reports/*.docx)"
+      "Bash(ls -la /Users/seth/Desktop/temp/coding/CTF/reports/*.docx)",
+      "Bash(find logs/session-*/game.json)",
+      "Bash(ls -d logs/session-*/)"
     ]
   }
 }
