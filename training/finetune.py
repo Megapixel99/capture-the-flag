@@ -9,7 +9,7 @@ import sys
 
 TRAINING_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(TRAINING_DIR, 'ctf_training_data.jsonl')
-MODEL_NAME = "Qwen/Qwen2.5-0.5B-Instruct"
+MODEL_NAME = "Qwen/Qwen2.5-1.5B-Instruct"
 OUTPUT_DIR = os.path.join(TRAINING_DIR, 'ctf-model-lora')
 FUSED_DIR = os.path.join(TRAINING_DIR, 'ctf-model-fused')
 
@@ -48,7 +48,7 @@ cmd = [
     '--data', TRAINING_DIR,
     '--adapter-path', OUTPUT_DIR,
     '--train',
-    '--iters', '500',
+    '--iters', '2000',
     '--batch-size', '4',
     '--num-layers', '8',
     '--learning-rate', '1e-4',

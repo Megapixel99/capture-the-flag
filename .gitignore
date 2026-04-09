@@ -1,3 +1,6 @@
 node_modules/
 .env
 logs/
+training/ctf-model-fused/
+training/ctf-model-lora/
+training/*.jsonl
