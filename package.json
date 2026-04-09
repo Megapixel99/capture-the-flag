@@ -10,6 +10,8 @@
     "start:all": "node src/index.js --all",
     "start:cloud": "node src/index.js --cloud",
     "start:cloud:loop": "node src/index.js --cloud --loop",
+    "start:cloud:custom": "node src/index.js --cloud --custom-bot",
+    "start:cloud:custom:loop": "node src/index.js --cloud --custom-bot --loop",
     "start:local-only:loop": "node src/index.js --local-only --loop",
     "start:segmented": "node src/index.js --segmented --local-only",
     "start:segmented-test": "node src/index.js --segmented --test",

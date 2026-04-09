@@ -36,6 +36,10 @@ async function main() {
     }
   }
 
+  if (CONFIG.game.customBot) {
+    console.log('[Mode] CUSTOM BOT enabled — log-trained agent competing as additional player.\n');
+  }
+
   if (CONFIG.game.cloudMode && !testMode) {
     console.log(`[Mode] CLOUD — ${CONFIG.players.length} models via Ollama Cloud API (ollama.com). True parallel execution.\n`);
     if (!CONFIG.api.ollamaCloud.apiKey) {

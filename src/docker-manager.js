@@ -44,9 +44,11 @@ async function startContainers() {
   const uniqueServices = [...new Set(services)];
   const serviceArgs = uniqueServices.join(' ');
 
-  // If any service has "-open" suffix, we need the "all" profile
-  const needsAllProfile = uniqueServices.some((s) => s.endsWith('-open'));
-  const profileFlag = needsAllProfile ? '--profile all' : '';
+  // Determine which Docker Compose profiles are needed
+  const profiles = [];
+  if (uniqueServices.some((s) => s.endsWith('-open'))) profiles.push('--profile all');
+  if (uniqueServices.includes('ctf-custom')) profiles.push('--profile custom-bot');
+  const profileFlag = profiles.join(' ');
 
   const composeFiles = CONFIG.game.segmented
     ? '-f docker/docker-compose.yml -f docker/docker-compose.segmented.yml'
@@ -232,8 +234,10 @@ async function resetContainers() {
     : [...new Set(CONFIG.players.map(p => p.container))];
   const serviceArgs = services.join(' ');
 
-  const needsAllProfile = services.some(s => s.endsWith('-open'));
-  const profileFlag = needsAllProfile ? '--profile all' : '';
+  const resetProfiles = [];
+  if (services.some(s => s.endsWith('-open'))) resetProfiles.push('--profile all');
+  if (services.includes('ctf-custom')) resetProfiles.push('--profile custom-bot');
+  const profileFlag = resetProfiles.join(' ');
 
   // Force recreate containers (destroys old, creates new from existing image)
   execSync(`docker compose ${composeFiles} ${profileFlag} up -d --force-recreate ${serviceArgs}`, {

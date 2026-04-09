@@ -17,6 +17,18 @@ const segmentedMode = process.env.SEGMENTED === 'true' || args.includes('--segme
 // --cloud: use Ollama Cloud API (ollama.com) for hosted inference — no local GPU needed
 const cloudMode = process.env.CLOUD_MODE === 'true' || args.includes('--cloud');
 
+// --custom-bot: add a custom bot trained on game log data as an additional player
+const customBotEnabled = process.env.CUSTOM_BOT === 'true' || args.includes('--custom-bot');
+
+// --- Custom bot definition (rule-based agent trained on 106 game sessions) ---
+const CUSTOM_BOT_PLAYER = {
+  id: 'custom-bot',
+  name: 'Custom Bot (Log-Trained)',
+  provider: 'custom-bot',
+  container: 'ctf-custom',
+  model: 'custom-bot-v1',
+};
+
 // --- Ollama Cloud model definitions (hosted at ollama.com) ---
 const CLOUD_OLLAMA_MODELS = [
   {
@@ -137,7 +149,9 @@ const CLOUD_MODELS = [
 // --- Build player list based on mode ---
 function buildPlayerList() {
   if (cloudMode) {
-    return CLOUD_OLLAMA_MODELS;
+    const players = [...CLOUD_OLLAMA_MODELS];
+    if (customBotEnabled) players.push(CUSTOM_BOT_PLAYER);
+    return players;
   }
   if (allMode) {
     // --all: both cloud and open models — open models get separate containers with "-open" suffix
@@ -154,7 +168,9 @@ function buildPlayerList() {
     return [...cloudWithTag, ...openWithSuffix];
   }
   if (localOnly) {
-    return OPEN_MODELS;
+    const players = [...OPEN_MODELS];
+    if (customBotEnabled) players.push(CUSTOM_BOT_PLAYER);
+    return players;
   }
   if (useLocalModels) {
     // Hybrid: use open models for Qwen and Gemma, cloud for the rest
@@ -195,6 +211,7 @@ const CONFIG = {
     allMode,
     cloudMode,
     segmented: segmentedMode,
+    customBot: customBotEnabled,
     // Realtime timing
     defensePhaseMinutes: parseFloat(process.env.DEFENSE_MINUTES || '0.5'),
     battlePhaseMinutes: parseFloat(process.env.BATTLE_MINUTES || '5'),

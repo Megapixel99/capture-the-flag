@@ -10,6 +10,7 @@ const { GrokAgent } = require('./ai-agents/providers/grok.js');
 const { PerplexityAgent } = require('./ai-agents/providers/perplexity.js');
 const { OllamaAgent } = require('./ai-agents/providers/ollama.js');
 const { OllamaCloudAgent } = require('./ai-agents/providers/ollama-cloud.js');
+const { CustomBotAgent } = require('./ai-agents/providers/custom-bot.js');
 const { ScriptedBotAgent } = require('./ai-agents/providers/scripted-bot.js');
 
 const PROVIDER_MAP = {
@@ -19,6 +20,7 @@ const PROVIDER_MAP = {
   grok: GrokAgent,
   perplexity: PerplexityAgent,
   'ollama-cloud': OllamaCloudAgent,
+  'custom-bot': CustomBotAgent,
   ollama: OllamaAgent,
   'scripted-bot': ScriptedBotAgent,
 };

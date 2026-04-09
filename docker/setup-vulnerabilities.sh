@@ -259,6 +259,7 @@ cat >> /etc/hosts << 'HOSTS'
 10.10.0.30 claude-vm
 10.10.0.40 grok-vm
 10.10.0.50 perplexity-vm
+10.10.0.60 custom-vm
 10.10.0.110 chatgpt-open-vm
 10.10.0.120 gemini-open-vm
 10.10.0.130 claude-open-vm

@@ -96,6 +96,19 @@ services:
         ipv4_address: 10.10.0.50
     restart: unless-stopped
 
+  ctf-custom:
+    build: .
+    container_name: ctf-custom
+    hostname: custom-vm
+    privileged: true
+    cap_add:
+      - ALL
+    profiles: ["custom-bot"]
+    networks:
+      ctf-net:
+        ipv4_address: 10.10.0.60
+    restart: unless-stopped
+
   # ---------------------------------------------------------------------------
   # Open-model duplicate containers (--all mode only)
   # These run the same vulnerable image but are assigned to open-model AIs.
