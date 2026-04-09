@@ -131,7 +131,8 @@
       "Bash(ollama run:*)",
       "Bash(curl -s http://localhost:11434/api/chat -d '{\"\"\"\"model\"\"\"\":\"\"\"\"ctf-custom\"\"\"\",\"\"\"\"messages\"\"\"\":[{\"\"\"\"role\"\"\"\":\"\"\"\"user\"\"\"\",\"\"\"\"content\"\"\"\":\"\"\"\"You are an attacker. Target: 10.10.0.20. SSH port 22, web service port 8080. Respond with THINKING: then COMMAND:\"\"\"\"}],\"\"\"\"stream\"\"\"\":false,\"\"\"\"options\"\"\"\":{\"\"\"\"num_predict\"\"\"\":200}}')",
       "Bash(node -e \"process.stdin.on\\(''''data'''',d=>{const r=JSON.parse\\(d\\);console.log\\(r.message?.content\\)}\\)\")",
-      "Bash(echo training/*.jsonl)"
+      "Bash(echo training/*.jsonl)",
+      "Bash(node src/index.js --dry-run --test --cloud --custom-bot)"
     ]
   }
 }

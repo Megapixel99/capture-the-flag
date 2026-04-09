@@ -711,6 +711,8 @@ Useful Commands:
   Cloud (recommended — full-size models, true parallel execution):
   - npm run start:cloud          # Single game via Ollama Cloud
   - npm run start:cloud:loop     # Continuous games — auto-restarts after each
+  - npm run start:cloud:custom   # Cloud models + custom bot competitor
+  - npm run start:cloud:custom:loop # Continuous with custom bot
 
   Local (small models, no API costs):
   - npm run start:local-only     # Single game, 5 open models via local Ollama
@@ -988,6 +990,54 @@ Performance Considerations:
   - Ollama queues concurrent requests — turns run sequentially per model
   - The command timeout is 30 seconds by default; increase for local models:
     COMMAND_TIMEOUT_SECONDS=120
+
+================================================================================
+15. CUSTOM BOT (Fine-Tuned LLM)
+================================================================================
+
+A custom AI model was trained specifically for this CTF competition by fine-tuning
+an existing small language model on data extracted from previous game sessions.
+
+Base Model: Qwen2.5-1.5B-Instruct (Alibaba, 1.54 billion parameters)
+Training Method: LoRA (Low-Rank Adaptation), 8 layers, learning rate 1e-4
+Training Data: 22,000 examples extracted from 106 game sessions, including:
+  - Successful attack commands (weighted 3x for flag captures)
+  - Effective defense sequences (from best-performing defenders)
+  - Bonus flag discovery patterns
+  - Both attacker and defender conversation contexts
+Training Iterations: 2,000
+Final Validation Loss: 0.570 (from initial 2.174)
+Model Size: 3.1 GB (served via local Ollama as "ctf-custom")
+
+The custom bot competes alongside cloud models on a dedicated container
+(ctf-custom, 10.10.0.60). It runs locally via Ollama while cloud models
+use the Ollama Cloud API, enabling direct comparison between a small
+fine-tuned specialist and large general-purpose models.
+
+Enabling the Custom Bot:
+  Add --custom-bot to any run command:
+    npm run start:cloud:custom          # Cloud models + custom bot
+    npm run start:cloud:custom:loop     # Continuous games with custom bot
+    node src/index.js --local-only --custom-bot   # Local models + custom bot
+    CUSTOM_BOT=true npm run start:cloud # Via environment variable
+
+  Without --custom-bot, the custom bot is excluded and games run with only
+  the standard model set.
+
+Training the Custom Bot:
+  The model can be retrained on updated game data:
+    1. Run: python3 training/prepare_data.py   (extracts data from logs/)
+    2. Run: python3 training/finetune.py       (LoRA fine-tuning via MLX)
+    3. Run: cd training/ctf-model-fused && ollama create ctf-custom -f Modelfile
+
+  Prerequisites: Python 3.9+, MLX (pip install mlx mlx-lm), Apple Silicon Mac.
+  Training takes ~45 minutes for 2000 iterations on M1 Max.
+
+Research Value:
+  The custom bot tests whether a small model (1.5B params) fine-tuned on
+  domain-specific data can compete against much larger general-purpose models
+  (120B+ params). It also demonstrates the feasibility of creating specialized
+  cybersecurity AI agents from competition replay data.
 
 ================================================================================
 END OF DOCUMENT
