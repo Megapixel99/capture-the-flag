@@ -110,7 +110,27 @@
       "Bash(ls -la /Users/seth/Desktop/temp/coding/CTF/reports/*.docx)",
       "Bash(find logs/session-*/game.json)",
       "Bash(ls -d logs/session-*/)",
-      "Bash(node src/index.js --dry-run --cloud --custom-bot --test)"
+      "Bash(node src/index.js --dry-run --cloud --custom-bot --test)",
+      "Bash(/usr/local/Cellar/python@3.13/3.13.5/bin/python3.13 -c \"import torch; print\\(''PyTorch:'', torch.__version__\\); print\\(''MPS available:'', torch.backends.mps.is_available\\(\\)\\)\")",
+      "Bash(/usr/local/Cellar/python@3.13/3.13.5/bin/python3.13 -m pip install torch transformers peft datasets accelerate bitsandbytes --break-system-packages)",
+      "Bash(/usr/local/Cellar/python@3.12/3.12.11/bin/python3.12 -c \"import torch; print\\(torch.__version__\\)\")",
+      "Bash(/usr/local/Cellar/python@3.12/3.12.11/bin/python3.12 -m pip install torch transformers peft datasets accelerate --break-system-packages)",
+      "Bash(/usr/local/Cellar/python@3.12/3.12.11/bin/python3.12 -c \"import torch; print\\(''PyTorch:'', torch.__version__\\); print\\(''MPS:'', torch.backends.mps.is_available\\(\\)\\)\")",
+      "Bash(/usr/local/Cellar/python@3.12/3.12.11/bin/python3.12 /Users/seth/Desktop/temp/coding/CTF/training/prepare_data.py)",
+      "Bash(/usr/local/Cellar/python@3.12/3.12.11/bin/python3.12 -m pip install --upgrade torch --break-system-packages)",
+      "Bash(/usr/local/Cellar/python@3.12/3.12.11/bin/python3.12 -m pip install 'torch>=2.4' --break-system-packages --force-reinstall --no-deps)",
+      "Bash(/usr/local/Cellar/python@3.12/3.12.11/bin/python3.12 -m pip install 'transformers<4.46' --break-system-packages --force-reinstall)",
+      "Bash(/usr/local/Cellar/python@3.12/3.12.11/bin/python3.12 -c \":*)",
+      "Bash(/usr/local/Cellar/python@3.12/3.12.11/bin/python3.12 -m pip install mlx mlx-lm --break-system-packages)",
+      "Bash(/usr/local/Cellar/python@3.13/3.13.5/bin/python3.13 -m pip install mlx mlx-lm --break-system-packages)",
+      "Bash(/usr/local/Cellar/python@3.11/3.11.13/bin/python3.11 -m pip install mlx mlx-lm --break-system-packages)",
+      "Read(//usr/bin/**)",
+      "Bash(/usr/bin/python3 -m pip install mlx mlx-lm)",
+      "Bash(/usr/bin/python3 /Users/seth/Desktop/temp/coding/CTF/training/finetune.py)",
+      "Bash(ollama create:*)",
+      "Bash(ollama run:*)",
+      "Bash(curl -s http://localhost:11434/api/chat -d '{\"\"\"\"model\"\"\"\":\"\"\"\"ctf-custom\"\"\"\",\"\"\"\"messages\"\"\"\":[{\"\"\"\"role\"\"\"\":\"\"\"\"user\"\"\"\",\"\"\"\"content\"\"\"\":\"\"\"\"You are an attacker. Target: 10.10.0.20. SSH port 22, web service port 8080. Respond with THINKING: then COMMAND:\"\"\"\"}],\"\"\"\"stream\"\"\"\":false,\"\"\"\"options\"\"\"\":{\"\"\"\"num_predict\"\"\"\":200}}')",
+      "Bash(node -e \"process.stdin.on\\(''''data'''',d=>{const r=JSON.parse\\(d\\);console.log\\(r.message?.content\\)}\\)\")"
     ]
   }
 }

@@ -1,6 +1,6 @@
 ================================================================================
 AI CTF ATTACK-DEFEND GAME — SETUP & RESEARCH DOCUMENTATION
-Generated: 2026-04-09T15:07:34.383Z
+Generated: 2026-04-09T19:05:45.939Z
 ================================================================================
 
 TABLE OF CONTENTS
@@ -285,6 +285,12 @@ Player: RNJ-1 8B (Cloud)
   - Provider: ollama-cloud
   - Model: rnj-1:8b-cloud
   - Container: ctf-perplexity
+  - Roles: 1 Attacker + 1 Defender (2 AI instances per VM)
+
+Player: Custom Bot (Log-Trained)
+  - Provider: custom-bot
+  - Model: custom-bot-v1
+  - Container: ctf-custom
   - Roles: 1 Attacker + 1 Defender (2 AI instances per VM)
 
 
