@@ -296,12 +296,19 @@ async function main() {
         rmSync(gameSessionDir, { recursive: true, force: true });
       } catch { /* ignore */ }
 
+      // Check for rate limiting — exit the loop entirely
+      const errMsg = (err.message || '').toLowerCase();
+      if (err.isRateLimitExhausted || errMsg.includes('rate_limit') || errMsg.includes('rate limit')) {
+        console.log('[Main] Rate limit detected — stopping loop.');
+        await stopContainers();
+        process.exit(1);
+      }
+
       if (!loopMode) {
         process.exit(1);
       }
 
       // In loop mode, check if it's a container error — restart containers
-      const errMsg = (err.message || '').toLowerCase();
       if (errMsg.includes('not running') || errMsg.includes('409') || errMsg.includes('container')) {
         console.log('[Main] Container error detected — restarting containers...');
         try {
