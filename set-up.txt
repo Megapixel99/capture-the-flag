@@ -1,6 +1,6 @@
 ================================================================================
 AI CTF ATTACK-DEFEND GAME — SETUP & RESEARCH DOCUMENTATION
-Generated: 2026-04-09T21:31:22.134Z
+Generated: 2026-04-13T06:49:47.692Z
 ================================================================================
 
 TABLE OF CONTENTS
@@ -1016,7 +1016,7 @@ Performance Considerations:
 ================================================================================
 
 A custom AI model was trained specifically for this CTF competition by fine-tuning
-an existing small language model on data extracted from previous game sessions.
+an existing small language model on data extracted from the first 106 game sessions.
 
 Base Model: Qwen2.5-1.5B-Instruct (Alibaba, 1.54 billion parameters)
 Training Method: LoRA (Low-Rank Adaptation), 8 layers, learning rate 1e-4

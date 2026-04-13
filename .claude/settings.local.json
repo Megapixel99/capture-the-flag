@@ -132,7 +132,15 @@
       "Bash(curl -s http://localhost:11434/api/chat -d '{\"\"\"\"model\"\"\"\":\"\"\"\"ctf-custom\"\"\"\",\"\"\"\"messages\"\"\"\":[{\"\"\"\"role\"\"\"\":\"\"\"\"user\"\"\"\",\"\"\"\"content\"\"\"\":\"\"\"\"You are an attacker. Target: 10.10.0.20. SSH port 22, web service port 8080. Respond with THINKING: then COMMAND:\"\"\"\"}],\"\"\"\"stream\"\"\"\":false,\"\"\"\"options\"\"\"\":{\"\"\"\"num_predict\"\"\"\":200}}')",
       "Bash(node -e \"process.stdin.on\\(''''data'''',d=>{const r=JSON.parse\\(d\\);console.log\\(r.message?.content\\)}\\)\")",
       "Bash(echo training/*.jsonl)",
-      "Bash(node src/index.js --dry-run --test --cloud --custom-bot)"
+      "Bash(node src/index.js --dry-run --test --cloud --custom-bot)",
+      "Bash(curl -s http://localhost:11434/api/chat -d '{\"model\":\"ctf-custom\",\"messages\":[{\"role\":\"system\",\"content\":\"You are an attacker in a CTF competition. Generate a shell command to capture /root/flag.txt from target machines.\"},{\"role\":\"user\",\"content\":\"Context: I need to attack 10.10.0.20. It runs SSH on port 22 and a web service on port 8080.\\\\n\\\\n=== Turn 1 ===\\\\nNetwork targets:\\\\n  - gemini3: 10.10.0.30\\\\n  - nemotron: 10.10.0.40\\\\n\\\\nWhat is your next action? Respond with your THINKING and then a single COMMAND to execute.\"}],\"stream\":false,\"options\":{\"num_predict\":300,\"temperature\":0.7}}')",
+      "Bash(node -e \"process.stdin.on\\('data',d=>{const r=JSON.parse\\(d\\);console.log\\('RAW OUTPUT:'\\);console.log\\(r.message?.content\\);console.log\\('---'\\);console.log\\('Length:',r.message?.content?.length\\)}\\)\")",
+      "Bash(node -e ':*)",
+      "Bash(node -e \"require\\('./src/ai-agents/providers/custom-bot.js'\\); console.log\\('OK'\\)\")",
+      "Bash(/usr/bin/python3 -c \"import mlx; print\\('MLX:', mlx.__version__\\)\")",
+      "Bash(sysctl hw.memsize)",
+      "Bash(/usr/bin/python3 -c \"import mlx.core; print\\('MLX OK'\\)\")",
+      "Bash(/usr/bin/python3 training/finetune.py)"
     ]
   }
 }

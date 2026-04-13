@@ -996,7 +996,7 @@ Performance Considerations:
 ================================================================================
 
 A custom AI model was trained specifically for this CTF competition by fine-tuning
-an existing small language model on data extracted from previous game sessions.
+an existing small language model on data extracted from the first 106 game sessions.
 
 Base Model: Qwen2.5-1.5B-Instruct (Alibaba, 1.54 billion parameters)
 Training Method: LoRA (Low-Rank Adaptation), 8 layers, learning rate 1e-4

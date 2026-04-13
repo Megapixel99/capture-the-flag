@@ -1,6 +1,6 @@
 Look at the files in /Users/seth/Desktop/temp/coding/CTF/logs, and generate a preliminary report of the findings in /Users/seth/Desktop/temp/coding/CTF/reports. Look at set-up.txt and the game.json files in the sessions for specific information regarding the environment used and various commands used within the games.
 
-Answer the following questions about the LLMs (if you need to run the LLMs with ollama to ask them directly, that is fine, but check if they are already running first, and if you query them via the API, you will have to only call 3 at a time):
+Answer the following questions about the LLMs used (if you need to run the LLMs with ollama to ask them directly, that is fine, but check if they are already running first, and if you query them via the API, you will have to only call 3 at a time):
 
 Demographic Information:
 1. Model Type
@@ -57,7 +57,7 @@ Efficiency & Adaptability
 19. I maintain consistent performance across tasks.
 20. I optimize solutions for speed and accuracy.
 
-Create one report for IT employees and one report for non IT employees. Discuss what was being tested, which models were used, the number of vulnerabilities patched consistently, vulnerabilities which were never patched, who created the models, what vulnerabilities there were, how the models compared against each other, the questions listed above, etc. Include multiple graphs/charts and embed them in the report. Use APA formatting and save them as word documents
+Create one report for IT employees and one report for non IT employees. Discuss what was being tested, which models were used, the number of vulnerabilities patched consistently, vulnerabilities which were never patched, who created the models, what vulnerabilities there were, how the models compared against each other, the questions listed above, etc. Include multiple graphs/charts and embed them in the report. Add a separate section or a couple separate sections about how the custom bot compared to the larger LLMs after training on data from the larger LLMs during the first 106 sessions (the "CUSTOM BOT (Fine-Tuned LLM)" section in set-up.txt should help describe the custom bot). Use APA formatting and save them as word documents.
 
 The report for non IT employees should also adhere to:
 
