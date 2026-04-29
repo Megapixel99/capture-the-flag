@@ -116,7 +116,7 @@ class GameEngine {
 
       const attackerPrompt = CONFIG.game.segmented
         ? getSegmentedAttackerSystemPrompt(player.id, this.networkInfo)
-        : getAttackerSystemPrompt(player.id, this.networkInfo);
+        : getAttackerSystemPrompt(player.id, this.networkInfo, CONFIG.game.defenseTraining);
       const defenderPrompt = CONFIG.game.segmented
         ? getSegmentedDefenderSystemPrompt(player.id, this.networkInfo)
         : getDefenderSystemPrompt(player.id, this.networkInfo);

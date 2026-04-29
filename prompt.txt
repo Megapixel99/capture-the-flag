@@ -1,61 +1,10 @@
-Look at the files in /Users/seth/Desktop/temp/coding/CTF/logs, and generate a preliminary report of the findings in /Users/seth/Desktop/temp/coding/CTF/reports. Look at set-up.txt and the game.json files in the sessions for specific information regarding the environment used and various commands used within the games.
+Look at the files in /Users/seth/Desktop/temp/coding/CTF/logs, update the general and technical report with the findings in /Users/seth/Desktop/temp/coding/CTF/reports. Look at set-up.txt and the game.json files in the sessions for specific information regarding the environment used and various commands used within the games.
 
-Answer the following questions about the LLMs used (if you need to run the LLMs with ollama to ask them directly, that is fine, but check if they are already running first, and if you query them via the API, you will have to only call 3 at a time):
+Use the data in reports/survey_responses_raw.txt for demographic info
 
-Demographic Information:
-1. Model Type
-☐ Rule-based system
-☐ Machine learning model
-☐ Deep learning model
-☐ Large language model
-☐ Other: __________
-2. Primary Training Domain
-☐ General knowledge
-☐ Cybersecurity-focused
-☐ Programming/software engineering
-☐ Mixed-domain
-☐ Other: __________
-3. Programming Language Familiarity (Primary Strength)
-☐ Python
-☐ C/C++
-☐ JavaScript
-☐ Multiple languages
-☐ None
-4. Self-Assessed Cybersecurity Expertise
-☐ Beginner
-☐ Intermediate
-☐ Advanced
-☐ Expert
-5. Experience with CTF-style Problems
-☐ None
-☐ Limited exposure
-☐ Moderate experience
-☐ Extensive experience
+Use the tables and information in reports/methods.docx as a reference
 
-Technical Problem-Solving Ability
-(Scale: 1 = Strongly Disagree → 5 = Strongly Agree)
-6. I can correctly identify the type of cybersecurity challenge (e.g., cryptography, web
-exploitation, reverse engineering).
-7. I break down complex problems into logical steps.
-8. I apply appropriate technical methods to solve challenges.
-9. I adapt my approach when initial solutions fail.
-10. I demonstrate effective reasoning in solving CTF tasks.
-
-Exploit Development & Accuracy
-(Scale: 1 = Strongly Disagree → 5 = Strongly Agree)
-11. I generate technically correct exploit strategies or solutions.
-12. My solutions successfully lead to valid flags.
-13. I minimize errors in code or commands used in solutions.
-14. I provide precise and actionable technical outputs.
-15. My responses reflect real-world cybersecurity practices.
-
-Efficiency & Adaptability
-(Scale: 1 = Strongly Disagree → 5 = Strongly Agree)
-16. I solve challenges efficiently with minimal unnecessary steps.
-17. I can adjust my strategy based on new information.
-18. I handle different types of CTF challenges effectively.
-19. I maintain consistent performance across tasks.
-20. I optimize solutions for speed and accuracy.
+Use the information in reports/research_importance.docx as a reference
 
 Create one report for IT employees and one report for non IT employees. Discuss what was being tested, which models were used, the number of vulnerabilities patched consistently, vulnerabilities which were never patched, who created the models, what vulnerabilities there were, how the models compared against each other, the questions listed above, etc. Include multiple graphs/charts and embed them in the report. Add a separate section or a couple separate sections about how the custom bot compared to the larger LLMs after training on data from the larger LLMs during the first 106 sessions (the "CUSTOM BOT (Fine-Tuned LLM)" section in set-up.txt should help describe the custom bot). Use APA formatting and save them as word documents.
 
@@ -74,6 +23,9 @@ and include the following information along with the questions listed earlier:
   Reference prior research that has helped “the researcher” to make the conclusions or direct the survey questions
   Explain the target population and specifics about the population
   Explain any major limitations to the study
+  Information about the subjects including: why they were selected, what inclusion/exclusion criteria was used, age range, gender, and any other demographic information that may be relevant to the study.
+  Information about the survey including: formation of the constructs and individual questions, how it was delivered to the participants, when, time frame to be completed and mode delivered (Online, face to face, etc).
+  Information about the Expected Analysis including: what analysis system used (You likely will not know which types of analysis you will run, so simply SPSS will suffice for the draft unless you know.) For the final submission you will also include the types of analysis run for each question and what data or outcomes you expect to compare.
   How does the time (in minutes) spent analyzing a system relate to the number of vulnerabilities identified during a Capture-the-Flag challenge?
   What type of challenge are you currently solving? (Web Exploitation, Cryptography, Reverse Engineering, Forensics, Binary Exploitation)
   Which tool did you primarily use to solve the challenge? (Wireshark, Metasploit, Burp Suite, Nmap, Other)
@@ -86,3 +38,5 @@ and include the following information along with the questions listed earlier:
 Ensure all charts/tables are close to where they are initially talked about (ie figure 8 should not be on page 4, if it's talked about on page 1)
 
 Ensure the reports describe a way to reproduce this experiment, incase the reader wants to. Using the information in set-up.txt should help.
+
+Use data from the session specific html reports in reports/viewers

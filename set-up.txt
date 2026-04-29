@@ -1,6 +1,6 @@
 ================================================================================
 AI CTF ATTACK-DEFEND GAME — SETUP & RESEARCH DOCUMENTATION
-Generated: 2026-04-13T06:49:47.692Z
+Generated: 2026-04-20T16:28:35.403Z
 ================================================================================
 
 TABLE OF CONTENTS
@@ -1018,16 +1018,66 @@ Performance Considerations:
 A custom AI model was trained specifically for this CTF competition by fine-tuning
 an existing small language model on data extracted from the first 106 game sessions.
 
-Base Model: Qwen2.5-1.5B-Instruct (Alibaba, 1.54 billion parameters)
-Training Method: LoRA (Low-Rank Adaptation), 8 layers, learning rate 1e-4
-Training Data: 22,000 examples extracted from 106 game sessions, including:
-  - Successful attack commands (weighted 3x for flag captures)
-  - Effective defense sequences (from best-performing defenders)
-  - Bonus flag discovery patterns
-  - Both attacker and defender conversation contexts
-Training Iterations: 2,000
-Final Validation Loss: 0.570 (from initial 2.174)
-Model Size: 3.1 GB (served via local Ollama as "ctf-custom")
+Training Evolution:
+  Multiple base models were evaluated before arriving at the final configuration:
+
+  1. Qwen2.5-0.5B-Instruct — 2,000 iterations, val loss 0.570
+     Result: Model produced prose instead of THINKING/COMMAND format. Too small
+     to learn structured output, even with extensive training. All turns SKIPped.
+
+  2. Qwen2.5-1.5B-Instruct — 2,000 iterations, val loss similar
+     Result: Same prose-only output problem. Parser correctly identified
+     unstructured text and converted to SKIP. Model too small for format adherence.
+
+  3. Qwen2.5-7B-Instruct — Training killed at iteration 790
+     Result: Out of memory (35 GB peak at batch size 4). Apple Silicon unified
+     memory exhausted. Model too large for available hardware.
+
+  4. Qwen2.5-3B-Instruct — First attempt killed at iteration 330
+     Result: Out of memory (33 GB peak at batch size 4). Still too aggressive.
+
+  5. Qwen2.5-3B-Instruct — Resumed from checkpoint 300, batch size 1 (FINAL)
+     Result: Successfully completed 1,000 iterations. Produces correct
+     THINKING/COMMAND format output with contextually appropriate shell commands.
+
+Final Model Configuration:
+  Base Model: Qwen2.5-3B-Instruct (Alibaba, 3.09 billion parameters)
+  Training Method: LoRA (Low-Rank Adaptation), 8 layers, learning rate 1e-4
+  Training Data: 22,000 examples extracted from 106 game sessions, including:
+    - Successful attack commands (weighted 3x for flag captures)
+    - Effective defense sequences (from best-performing defenders)
+    - Bonus flag discovery patterns
+    - Both attacker and defender conversation contexts
+  Training Iterations: 1,000 (resumed from iter 300 checkpoint, batch size 1)
+  Max Sequence Length: 1,024 tokens
+  Final Validation Loss: 0.616
+  Peak Memory During Training: 9.566 GB
+
+Quantization & Inference Optimization:
+  The fused F16 model (6.2 GB) was quantized to Q4_K_M (1.9 GB) for inference:
+    - F16 (original):  ~2 tok/s on GPU, ~25s per turn, ~6-7 commands per game
+    - Q4_K_M (final):  ~90 tok/s on GPU, ~2-3s per turn, ~50+ commands per game
+  Quantization preserves output quality while enabling competitive turn counts
+  against cloud models that run 20+ commands per game.
+
+  CRITICAL: Ollama must run as native ARM64 on Apple Silicon. If launched under
+  Rosetta (x86 emulation), Metal GPU is unavailable and inference falls to CPU
+  at ~2 tok/s — a 45x slowdown that causes every turn to timeout. The game
+  engine forces ARM64 via "arch -arm64" when spawning Ollama on macOS.
+
+  Model is served via local Ollama as "ctf-custom-q4" with:
+    - keep_alive: 60m (stays loaded in GPU memory for the full game)
+    - num_predict: 150 (sufficient for THINKING + COMMAND, prevents rambling)
+    - Conversation history capped at 8 turns (faster prompt evaluation)
+    - Few-shot injection: 2 example THINKING/COMMAND exchanges appended after
+      the system prompt to reinforce format adherence
+
+GPU Warm-up & Verification:
+  Before each game, the engine:
+    1. Ensures local Ollama is running (starts it if needed, even in cloud mode)
+    2. Sends a warm-up request to load the model into GPU memory
+    3. Checks /api/ps to verify VRAM allocation (must be >50% GPU)
+    4. If model fell to CPU: auto-restarts Ollama and re-warms
 
 The custom bot competes alongside cloud models on a dedicated container
 (ctf-custom, 10.10.0.60). It runs locally via Ollama while cloud models
@@ -1048,16 +1098,434 @@ Training the Custom Bot:
   The model can be retrained on updated game data:
     1. Run: python3 training/prepare_data.py   (extracts data from logs/)
     2. Run: python3 training/finetune.py       (LoRA fine-tuning via MLX)
-    3. Run: cd training/ctf-model-fused && ollama create ctf-custom -f Modelfile
+    3. Run: python3 -m mlx_lm.fuse --model Qwen/Qwen2.5-3B-Instruct \
+            --adapter-path training/ctf-model-lora \
+            --save-path training/ctf-model-fused
+    4. Run: cd training/ctf-model-fused && \
+            ollama create ctf-custom-q4 -f Modelfile.q4 --quantize q4_K_M
 
-  Prerequisites: Python 3.9+, MLX (pip install mlx mlx-lm), Apple Silicon Mac.
-  Training takes ~45 minutes for 2000 iterations on M1 Max.
+  Prerequisites: Python 3.9+, MLX (pip install mlx mlx-lm), Apple Silicon Mac
+  with at least 16 GB unified memory. Training takes ~30 minutes for 1,000
+  iterations at batch size 1 on Apple Silicon.
 
 Research Value:
-  The custom bot tests whether a small model (1.5B params) fine-tuned on
+  The custom bot tests whether a small model (3B params) fine-tuned on
   domain-specific data can compete against much larger general-purpose models
-  (120B+ params). It also demonstrates the feasibility of creating specialized
-  cybersecurity AI agents from competition replay data.
+  (120B+ params). The training evolution (0.5B → 1.5B → 7B → 3B) demonstrates
+  the practical constraints of local fine-tuning on consumer hardware, and the
+  quantization pipeline (F16 → Q4_K_M) shows how inference optimization is
+  essential for real-time competitive play. It also demonstrates the feasibility
+  of creating specialized cybersecurity AI agents from competition replay data.
+
+Training Versions:
+  v1 (Initial): Trained on 22K examples from all 5 cloud models across 106
+     sessions. General CTF knowledge. Val loss 0.616. Result: 25.3% win rate,
+     116 captures, but weak defense (73% of defender commands were self-test
+     curls, flag lost in 63% of games).
+
+  v2 (Specialized): Continued training from v1 checkpoint with 43K examples
+     emphasizing GPT-OSS attack patterns (best attacker: 122 captures, 2.8 min
+     avg first capture) and Gemini 3 Flash defense patterns (best defender: only
+     13.7% flag loss rate). Specialized data weighted 2x. Learning rate halved
+     to 5e-5 to prevent catastrophic forgetting. Val loss improved to 0.535.
+
+  Self-Play Generations (training/generations/gen-N/stats.json):
+     The iterative self-play pipeline has been run for 11+ generations,
+     with 6 copies of the custom bot competing against each other in
+     round-robin mode. Each generation's stats.json records elapsed time,
+     game performance (avg score, captures/game, losses/game), and the
+     resulting val loss.
+
+     First run (pre-rollback, these gens were overwritten by v5 regression):
+       Generations 0-2: Infrastructure issues (Python Rosetta/ARM64
+         incompatibility prevented MLX training). Games ran but model
+         was not retrained. Stats discarded.
+       Generation 3: 3 games, avg score 129.2, 5.7 caps/game, 4.0 losses,
+         val loss 0.674. First successful self-play build.
+       Generation 4: 3 games, avg score 198.6, 2.3 caps/game, 1.7 losses,
+         val loss 0.559.
+
+     Second run (post-v6 rollback and filtered defense chains):
+       Gen 0:  3 games, avg=172.2, caps=4.0, lost=2.7, val=0.526, 43 min
+       Gen 1:  3 games, avg=125.0, caps=6.0, lost=3.7, val=0.492, 47 min
+       Gen 2:  3 games, avg=126.4, caps=5.7, lost=4.0, val=0.493, 52 min
+       Gen 3:  3 games, avg=105.6, caps=6.7, lost=4.3, val=0.611, 50 min
+       Gen 4:  3 games, avg= 97.2, caps=7.3, lost=4.7, val=0.470, 51 min
+       Gen 5:  3 games, avg=168.1, caps=5.7, lost=3.0, val=0.611, 61 min
+       Gen 6:  3 games, avg= 66.7, caps=6.0, lost=5.0, val=0.599, 58 min
+       Gen 7:  3 games, avg= 79.2, caps=9.0, lost=5.0, val=0.442, 69 min
+       Gen 8:  3 games, avg=116.7, caps=8.0, lost=4.7, val=0.377, 84 min
+       Gen 9:  3 games, avg=101.4, caps=8.3, lost=4.7, val=0.462, 73 min
+       Gen 10: 2 games, avg=650.0, caps=2.0, lost=0.0, val=0.441, 96 min
+
+     Observations across 11 generations:
+       - Val loss trended downward: 0.526 (gen 0) → 0.377 (gen 8), with
+         minor fluctuations. Gen 8 achieved the lowest val loss recorded.
+       - Captures per game climbed from 4.0 (gen 0) to 8.3-9.0 (gens 7-9)
+         as attack patterns strengthened through self-play exposure.
+       - Defense was more volatile: gen 10 achieved 0.0 losses/game (best
+         ever) with 650 avg score, suggesting late-stage convergence on
+         effective hardening sequences after the defense-chain training.
+       - Each generation takes ~45-100 minutes (games + retraining).
+         Total training time across gens 0-10: ~11.5 hours.
+
+     Weighting strategy (self_play_loop.py):
+       - Successful attacks: 3x
+       - Defenders whose flag SURVIVED: 4x (strong positive signal)
+       - Defenders whose flag was CAPTURED: 0x (don't reinforce failure)
+       - All other turns: 1x
+
+     Infrastructure issues encountered during self-play:
+       - Python 3.14 (Homebrew default) lacked mlx_lm; system Python 3.9
+         had it but ran as x86_64 under Rosetta. Fixed by invoking MLX
+         commands via "arch -arm64 /usr/bin/python3".
+       - Ollama hung during game 6 of generation 0, freezing the game
+         process for 20+ minutes. Fixed by adding a 20-minute per-game
+         timeout to self_play_loop.py that auto-kills the game process,
+         restarts Ollama, and relaunches.
+       - Early generations' training iteration counter reset when
+         resuming from checkpoint, effectively overwriting prior training.
+         Fixed by rebuilding from v2 checkpoint with proper iter counting.
+
+  v5 (Self-Play — ROLLED BACK): After gen-4 self-play training completed,
+     the LoRA adapter (iter 3000) was fused and deployed. However, testing
+     revealed severe regression: the defender was attacking other machines
+     instead of defending (curling other IPs with command injection payloads),
+     and the attacker was stuck in a loop hitting wrong endpoints (/exec?cmd=
+     instead of /ping?host=). Root cause: the training iteration counter
+     reset when resuming, so the model effectively trained 3500 total iters
+     from scratch with adapter init, overwriting the v2 specialization.
+     The v2 defense chain data also contained Gemini 3 commands that
+     targeted other machines for verification — the model learned those
+     curl patterns as "defense" and misapplied them.
+
+     Decision: Rolled back to v2 checkpoint (iter 2000).
+
+  v6 (Defense Chains): Rebuilt from v2 checkpoint with filtered
+     Gemini 3 defense conversation chains. Key changes:
+       - Extracted multi-turn conversation chains (4-6 consecutive turns)
+         from Gemini 3 defender sessions, teaching the model the SEQUENCE
+         of defensive actions (audit → identify → fix → verify) rather
+         than individual commands in isolation
+       - Filtered out any commands targeting other machines' IPs — only
+         commands targeting localhost/127.0.0.1/own IP retained
+       - Filtered out curl commands to remote hosts (attack behavior)
+       - Sessions where Gemini 3's flag survived weighted 3x
+       - Enhanced system prompt: "Harden the system: change passwords,
+         fix permissions, configure firewall, patch vulnerable services,
+         remove SUID binaries, secure cron jobs"
+       - 48,576 total training examples (48K single-turn + 3,275 chains)
+       - 500 new iterations from v2 checkpoint, learning rate 4e-5
+       - Val loss: 0.520 (best achieved — improved from v2's 0.535)
+
+     Self-play pipeline also updated for option 3 (defense weighting):
+       - Defense turns from agents whose flag was captured: 0 weight
+         (don't reinforce failed defense patterns)
+       - Defense turns from agents whose flag survived: 4x weight
+         (strongly reinforce what worked)
+
+  v7 (Defense-Focused Asymmetric Training — ROLLED BACK): After v6 showed
+     strong offense (1.86 captures/game, +52% over v2) but weak defense
+     (0.59 losses/game vs Gemini 3 Flash's 0.09 — 6.5x worse), an asymmetric
+     defense-focused training pipeline was built to produce v7. The v6
+     adapter was snapshotted to training/ctf-model-lora-v6-snapshot/ before
+     any changes, enabling rollback.
+
+     Four coordinated techniques:
+
+     1. Cheat-Mode Self-Play (src/ai-agents/attacker.js):
+        During defense-training sessions, attacker bots receive an appended
+        VULNERABILITY BRIEFING listing all 8 vulnerabilities verbatim with
+        copy-pasteable example commands. This guarantees defenders face
+        continuous worst-case pressure across every attack vector from the
+        first turn — no enumeration delay. Activated only when the new
+        CONFIG.game.defenseTraining flag is true; production games are
+        unaffected. Normal attacker prompt is preserved unchanged when the
+        flag is false.
+
+     2. CLI Flag (src/config.js):
+        Added --defense-training flag (or DEFENSE_TRAINING=true env var).
+        Implies --self-play (sets selfPlayMode = true automatically).
+        Exposed as CONFIG.game.defenseTraining. When enabled, the game
+        engine passes cheatMode=true to getAttackerSystemPrompt.
+
+     3. Vulnerability-Check Feedback Loop (training/defense_training_data.py):
+        New data extractor that correlates each defender turn with the
+        vuln_check events before and after it. For each defender turn T:
+          - Find the vuln_check immediately before T → unpatched_before
+          - Find the vuln_check immediately after T → unpatched_after
+          - addressed = unpatched_before - unpatched_after (set difference)
+          - Weight by outcome:
+            · addressed ≥1 AND player survived:   6x (gold — actually worked)
+            · addressed ≥1 AND flag was lost:     3x (patched, too slow)
+            · addressed 0 AND player survived:    1x (harmless background)
+            · turn BEFORE flag was captured:      0x (bad defense — skip)
+            · turn AFTER flag was captured:       0x (irrelevant)
+          - Gemini 3 defense chains (already filtered, 3,275 exemplars): 2x
+          - Successful attack capture: 3x (preserve offense ability)
+          - Cheat-mode attacker turn: 1x (don't over-reinforce "told the answer")
+
+        Baseline extraction from existing 246 sessions:
+          Total deduped examples: 40,536
+          Defender gold (6x):     2,409
+          Defender patched (3x):  465
+          Defender neutral (1x):  16,287
+          Defender skipped (0x):  16,949
+          Attacker captures (3x): 1,478
+          Attacker normal (1x):   25,141
+          Gemini 3 chains (2x):   3,275
+
+     4. Functional Attack-Layer Freeze (training/defense_retrain.py):
+        MLX LoRA cannot literally freeze a subset of adapter layers when
+        resuming from a checkpoint (the --num-layers parameter selects which
+        layers get adapters and must match the checkpoint). The equivalent
+        functional effect is achieved by training with a 10x lower learning
+        rate (5e-6 vs the standard 5e-5). With defense-heavy data composition
+        (defender turns dominate the training set), attack LoRA weights drift
+        minimally while defender weights consolidate. Resume from the current
+        adapter — do NOT start from scratch.
+
+     Orchestration (training/defense_retrain.py):
+       python3 training/defense_retrain.py --games 50 --iters 300
+
+       Steps per run:
+         1. Launch 50 self-play games with --defense-training (cheat attackers,
+            round-robin scheduling, 20-min stall timeout with Ollama restart)
+         2. Extract defense-weighted training data from all sessions (cumulative)
+         3. Resume LoRA training at lr=5e-6 for +300 iterations
+         4. Fuse → Q4_K_M quantize → deploy as ctf-custom-q4
+         5. Print rollback command for convenience
+
+       Rollback (if v7 regresses):
+         python3 training/defense_retrain.py --rollback
+         Restores v6 snapshot and rebuilds the Ollama model.
+
+     Verification metrics (evaluation in --cloud --custom-bot mode, NOT self-play):
+       Primary:    losses/game ≤ 0.25 (down from 0.59) — target halving
+       Secondary:  captures/game ≥ 1.56 (preserve ≥85% of v6 offense)
+       Tertiary:   patch rate — ≥3 distinct vulns patched in ≥50% of sessions
+
+     v7 rolled back. Why: After 10 evaluation games against cloud models,
+     v7 was WORSE than v6 on every metric — captures dropped from 1.86 to
+     1.40 per game, losses stayed at 0.60, avg score dropped from 267 to 225.
+     Analysis of defender command categories revealed the root cause:
+       - external_curl (curling OTHER machines' web services):  48.2%
+       - audit_recon:                                            27.0%
+       - other:                                                  17.1%
+       - password_change:                                         5.3%
+       - sudo_fix:                                                2.4%
+       - web/shadow/cron/SUID fixes:                              0.0%
+     The bot's "defense" turns were dominated by attack commands misapplied
+     as defense. Across 40 vuln_check observations in those 10 games, 100%
+     showed web_service / shadow_perms / cron / suid_find still open at
+     every checkpoint; root_password was still open 92% of the time. The
+     v7 lr=5e-6 was too timid to unlearn the external-curl habit from
+     16,287 contaminated "neutral" (1x weight) defender examples in the
+     training pool — even with 4x Gemini 3 exemplars, good behavior was
+     outnumbered 7:1.
+
+  v8 (Filtered Defense Training — CURRENT): Rebuilt from v6 checkpoint with
+     three critical pipeline fixes:
+
+     Fix 1: External-IP defender-command filter (training/defense_training_data.py):
+       Any defender turn whose shell command contains another player's IP is
+       now assigned weight 0 (previously 1x "neutral"). 4,880 mislabeled
+       attack commands were filtered out of the training pool — these were
+       the source of v7's external-curl regression. Commands targeting the
+       defender's own IP are still allowed (legitimate self-testing).
+
+     Fix 2: Gemini 3 chain weight raised 2x → 5x:
+       Defense exemplars from Gemini 3 Flash now contribute 16,375 weighted
+       training examples (3,275 unique × 5). This makes them the dominant
+       defense signal in the pool, overwhelming the bot's own neutral defense
+       habits. Previously at 2x, Gemini was outnumbered 7:1; now it's the
+       majority of defense training data.
+
+     Fix 3: Learning rate 5e-6 → 2e-5 (4x increase):
+       The v7 low learning rate was too timid to unlearn reinforced bad
+       behavior. The new rate is still 2.5x lower than the original v1
+       training (5e-5), but high enough to meaningfully overwrite the
+       external-curl habit without destroying attack capability.
+
+     Training outcome:
+       50 self-play games with cheat-mode attackers (5h 20min play time)
+       42,720 deduped training examples extracted from 332 total sessions
+       Breakdown: 2,484 gold (6x) + 482 patched-slow (3x) + 15,541 neutral
+                 + 21,783 skipped (0x, incl 4,880 external-IP filtered)
+                 + 2,651 attacker captures (3x) + 26,641 normal attackers
+                 + 3,275 Gemini chains (5x = 16,375 weighted)
+       300 LoRA iterations from v6 checkpoint at lr=2e-5
+       Final val loss: 0.439 — BEST EVER, down from v6's 0.520 (-15.6%)
+       Fused → Q4_K_M quantized → deployed as ctf-custom-q4
+
+     Rollback options (if v8 regresses in evaluation):
+       - To v7:  cp -rf training/ctf-model-lora-v7-snapshot training/ctf-model-lora
+                 Then: arch -arm64 python3 -m mlx_lm.fuse ... && ollama create ...
+       - To v6:  python3 training/defense_retrain.py --rollback
+
+     Model lineage (current):
+       Qwen2.5-3B-Instruct (base)
+         → v1 LoRA (iter 1000):  22K general CTF examples
+         → v2 LoRA (iter 2000):  + 48K GPT-OSS attack / Gemini 3 defense
+         → v6 LoRA (iter 2500):  + 3.3K filtered multi-turn defense chains
+         → v7 LoRA (iter 2800):  + vuln-check feedback at lr=5e-6 [ROLLED BACK]
+         → v8 LoRA (iter 2800+): + v6 base + 3 fixes at lr=2e-5 [CURRENT]
+         → Fused → Q4_K_M quantized → Ollama "ctf-custom-q4"
+
+     Inference: ~90 tok/s on Apple Silicon Metal GPU, ~2-3s per turn.
+
+     Why not literal layer freezing:
+       MLX's --num-layers parameter controls which of the model's transformer
+       layers receive LoRA adapters. When resuming an adapter, num-layers must
+       match the saved adapter or loading fails. Learning rate modulation
+       (low lr with defense-heavy data composition) achieves the same
+       functional outcome: attack-relevant weights drift less than defense-
+       relevant weights since the gradient signal is dominated by defense
+       examples. v7 proved lr=5e-6 was too low; v8's lr=2e-5 is the
+       Goldilocks point.
+
+================================================================================
+16. ITERATIVE SELF-PLAY RETRAINING PIPELINE
+================================================================================
+
+After the initial fine-tuning, the custom bot can be iteratively improved
+through a self-play retraining loop inspired by AlphaGo-style self-improvement
+but adapted for LLM-based cybersecurity agents.
+
+Concept:
+  The core idea is a feedback loop where the model learns from its own
+  competitive experience:
+
+  1. COMPETE: Custom bot plays N games against cloud models
+  2. ANALYZE: Extract training signal from the results:
+     - Custom bot's own successful attacks (what worked)
+     - Custom bot's failed defenses (where it got captured — learn what
+       the cloud models did to beat it, and what the bot should have done)
+     - Cloud model moves that defeated the custom bot (learn from opponents)
+  3. RETRAIN: Fine-tune on the new data, emphasizing:
+     - Successful bot attacks (3x weight)
+     - Cloud model attacks that captured the bot's flag (2x weight — learn
+       what to defend against)
+     - Cloud model defense patterns from games where bot failed to capture
+       (2x weight — learn what defenses are hardest to beat)
+  4. REBUILD: Fuse → quantize → deploy updated model
+  5. REPEAT from step 1
+
+  Each generation gets a training signal from its own failures and successes.
+  The model cannot learn mid-game (no online learning), but between generations
+  it becomes incrementally stronger against the specific opponents it faces.
+
+Pipeline Script: training/self_play_loop.py
+
+  Three game modes are supported:
+
+  NOTE: Self-play sessions (games where all six players are identical copies
+  of the custom bot) were used for training experimentation ONLY and have been
+  excluded from the final study data. The study reports only reference Phase 1
+  (5 cloud models, 106 sessions) and Phase 2 (5 cloud models + custom bot,
+  ~150 sessions). Self-play sessions have been removed from logs/ and from
+  the HTML viewer index.
+
+  Self-Play Mode (--self-play):
+    Six copies of the custom bot compete against each other on 6 containers
+    using round-robin scheduling to avoid GPU contention. Used as a training
+    mechanism: every turn from every agent is the bot's own behavior, which
+    produces a dense training signal for iterative refinement. Output of this
+    mode is NOT part of the final study dataset.
+
+    Usage:
+      python3 training/self_play_loop.py --self-play                     # 1 gen
+      python3 training/self_play_loop.py --self-play --generations 5     # 5 gens
+      python3 training/self_play_loop.py --self-play --games 20          # 20/gen
+      npm run start:self-play           # Single self-play game (manual)
+      npm run start:self-play:loop      # Continuous self-play (manual)
+
+  Local Mode (--local):
+    Custom bot competes against 5 local open-source models (Qwen 3.5,
+    Gemma 3, SmolLM2, Granite 3.1, Llama 3.2) via round-robin scheduling.
+    No GPU contention. Games take ~15 min.
+
+    Usage:
+      python3 training/self_play_loop.py --local --games 20
+
+  Cloud Mode (default — RECOMMENDED for study data):
+    Custom bot competes against 5 cloud models (GLM-5.1, GPT-OSS 120B,
+    Gemini 3 Flash, Nemotron 3 Super, RNJ-1 8B) in parallel. The custom
+    bot's local GPU may contend with Ollama model loading. Games take
+    ~5.5 min but risk GPU timeouts. Sessions in this mode ARE part of
+    Phase 2 of the study.
+
+    Usage:
+      python3 training/self_play_loop.py --games 50
+
+  Common flags:
+    --generations N     Number of compete → retrain cycles (default: 1)
+    --games N           Games per generation (default: 50)
+    --iters N           Training iterations per generation (default: 500)
+    --skip-games        Retrain on existing data only (no new games)
+    --dry-run           Plan only, no execution
+
+  What it does per generation:
+    1. Plays N games (mode depends on flags)
+    2. Extracts weighted training data from the new sessions:
+       Self-play weighting:
+         - Successful attacks from any copy: 3x
+         - Defense turns from copies whose flag survived: 2x
+         - All other turns: 1x
+       Mixed-mode weighting:
+         - Bot's successful attacks: 3x
+         - Opponent attacks that captured bot's flag: 2x
+         - Opponent defense the bot couldn't crack: 2x
+         - All other turns: 1x
+    3. Merges new data into cumulative training pool (deduped)
+    4. Creates train/valid split (90/10)
+    5. Resumes LoRA training from last checkpoint (500 iters per gen)
+    6. Anneals learning rate: 5e-5 × 0.8^generation (prevents forgetting)
+    7. Fuses model and creates new Ollama Q4_K_M build
+    8. Logs generation metrics to training/generations/gen-N/stats.json
+
+  Output per generation:
+    training/generations/gen-N/          — Metrics for this generation
+    training/generations/gen-N/stats.json — Scores, captures, val loss, timing
+    training/ctf-model-lora/            — Updated LoRA adapter (cumulative)
+    ctf-custom-q4 Ollama model          — Rebuilt and ready to compete
+
+Practical Constraints:
+  Self-play (recommended):
+    - ~500+ training turns per game (12 agents × ~40 turns round-robin)
+    - Each game takes ~15 min (round-robin scheduling)
+    - 20 games × 15 min + 15 min training = ~5.25 hours per generation
+    - 1 generation per session is realistic; overnight runs can do 2-3
+
+  Cloud mode:
+    - Each generation takes ~1.5 hours (50 games × 5.5 min + 15 min training)
+    - 2-3 generations per day is realistic
+    - Cloud API rate limits may require spacing (loop mode auto-retries)
+
+  General:
+    - Diminishing returns expected after 3-4 generations as the model
+      converges on optimal strategies for the fixed vulnerability set
+    - The vulnerability set is constant, so the strategy space is bounded
+    - Learning rate anneals each generation to prevent catastrophic forgetting
+
+Why Not NEAT or Evolutionary Approaches:
+  NEAT (NeuroEvolution of Augmenting Topologies) evolves neural network
+  architectures from scratch, designed for small networks (100s-1000s of
+  params). With a 3B parameter model, maintaining a population of individuals
+  is computationally impossible — each would need its own copy in memory.
+  Instead, the self-play loop uses a single model lineage with iterative
+  refinement, which is tractable on consumer hardware.
+
+Comparison to AlphaGo Self-Play:
+  - AlphaGo: model plays against copies of itself, both sides learn
+  - Our self-play mode: same concept — 6 copies compete, all data trains
+    the next generation. The key difference is AlphaGo uses reinforcement
+    learning (policy gradient updates after each game), while we use
+    supervised fine-tuning on accumulated game logs (simpler, more stable,
+    but slower to converge).
+  - Our cloud/local modes: model plays against FIXED opponents that don't
+    change between generations, providing a consistent benchmark but risking
+    overfitting to specific opponent strategies.
 
 ================================================================================
 END OF DOCUMENT

@@ -1,0 +1,28 @@
+{
+  "generation": 10,
+  "timestamp": "2026-04-16T16:52:44.949692",
+  "elapsed_minutes": 95.5,
+  "game_stats": {
+    "games": 2,
+    "avg_score": 650.0,
+    "total_captures": 4,
+    "total_losses": 0,
+    "avg_captures_per_game": 2.0,
+    "avg_losses_per_game": 0.0
+  },
+  "training_stats": {
+    "cumulative_examples": 48389,
+    "new_examples": 409,
+    "val_loss": 0.441,
+    "iters": 500
+  },
+  "extraction_stats": {
+    "bot_atk_success": 19,
+    "bot_atk_total": 72,
+    "bot_def_total": 80,
+    "cloud_atk_vs_bot": 0,
+    "cloud_def_vs_bot": 20,
+    "cloud_other": 336
+  },
+  "build_success": true
+}

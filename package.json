@@ -12,6 +12,8 @@
     "start:cloud:loop": "node src/index.js --cloud --loop",
     "start:cloud:custom": "node src/index.js --cloud --custom-bot",
     "start:cloud:custom:loop": "node src/index.js --cloud --custom-bot --loop",
+    "start:self-play": "node src/index.js --self-play",
+    "start:self-play:loop": "node src/index.js --self-play --loop",
     "start:local-only:loop": "node src/index.js --local-only --loop",
     "start:segmented": "node src/index.js --segmented --local-only",
     "start:segmented-test": "node src/index.js --segmented --test",

@@ -3,4 +3,9 @@ node_modules/
 logs/
 training/ctf-model-fused/
 training/ctf-model-lora/
+training/ctf-model-lora-*-snapshot/
 training/*.jsonl
+training/__pycache__/
+reports/~$*.docx
+reports/*.zip
+.claude/settings.local.json

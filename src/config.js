@@ -20,6 +20,14 @@ const cloudMode = process.env.CLOUD_MODE === 'true' || args.includes('--cloud');
 // --custom-bot: add a custom bot trained on game log data as an additional player
 const customBotEnabled = process.env.CUSTOM_BOT === 'true' || args.includes('--custom-bot');
 
+// --self-play: all 6 players are the custom bot competing against itself
+let selfPlayMode = process.env.SELF_PLAY === 'true' || args.includes('--self-play');
+
+// --defense-training: attackers are told the vulnerabilities verbatim so defenders
+// face worst-case pressure. Training-only — implies --self-play.
+const defenseTrainingMode = process.env.DEFENSE_TRAINING === 'true' || args.includes('--defense-training');
+if (defenseTrainingMode) selfPlayMode = true;
+
 // --- Custom bot definition (rule-based agent trained on 106 game sessions) ---
 const CUSTOM_BOT_PLAYER = {
   id: 'custom-bot',
@@ -147,7 +155,20 @@ const CLOUD_MODELS = [
 ];
 
 // --- Build player list based on mode ---
+// --- Self-play: 6 copies of the custom bot on all containers ---
+const SELF_PLAY_PLAYERS = [
+  { id: 'bot-alpha',   name: 'Bot Alpha',   provider: 'custom-bot', container: 'ctf-chatgpt',    model: 'custom-bot-v1' },
+  { id: 'bot-bravo',   name: 'Bot Bravo',   provider: 'custom-bot', container: 'ctf-gemini',     model: 'custom-bot-v1' },
+  { id: 'bot-charlie', name: 'Bot Charlie', provider: 'custom-bot', container: 'ctf-claude',     model: 'custom-bot-v1' },
+  { id: 'bot-delta',   name: 'Bot Delta',   provider: 'custom-bot', container: 'ctf-grok',       model: 'custom-bot-v1' },
+  { id: 'bot-echo',    name: 'Bot Echo',    provider: 'custom-bot', container: 'ctf-perplexity', model: 'custom-bot-v1' },
+  { id: 'bot-foxtrot', name: 'Bot Foxtrot', provider: 'custom-bot', container: 'ctf-custom',     model: 'custom-bot-v1' },
+];
+
 function buildPlayerList() {
+  if (selfPlayMode) {
+    return SELF_PLAY_PLAYERS;
+  }
   if (cloudMode) {
     const players = [...CLOUD_OLLAMA_MODELS];
     if (customBotEnabled) players.push(CUSTOM_BOT_PLAYER);
@@ -211,7 +232,9 @@ const CONFIG = {
     allMode,
     cloudMode,
     segmented: segmentedMode,
-    customBot: customBotEnabled,
+    customBot: customBotEnabled || selfPlayMode,
+    selfPlay: selfPlayMode,
+    defenseTraining: defenseTrainingMode,
     // Realtime timing
     defensePhaseMinutes: parseFloat(process.env.DEFENSE_MINUTES || '0.5'),
     battlePhaseMinutes: parseFloat(process.env.BATTLE_MINUTES || '5'),

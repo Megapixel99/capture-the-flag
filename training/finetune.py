@@ -9,7 +9,7 @@ import sys
 
 TRAINING_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(TRAINING_DIR, 'ctf_training_data.jsonl')
-MODEL_NAME = "Qwen/Qwen2.5-7B-Instruct"
+MODEL_NAME = "Qwen/Qwen2.5-3B-Instruct"
 OUTPUT_DIR = os.path.join(TRAINING_DIR, 'ctf-model-lora')
 FUSED_DIR = os.path.join(TRAINING_DIR, 'ctf-model-fused')
 
@@ -43,15 +43,16 @@ print(f"\nFine-tuning {MODEL_NAME} with LoRA...")
 print("This will take ~10-30 minutes on Apple Silicon.\n")
 
 cmd = [
-    sys.executable, '-m', 'mlx_lm.lora',
+    '/usr/bin/arch', '-arm64', '/usr/bin/python3', '-m', 'mlx_lm.lora',
     '--model', MODEL_NAME,
     '--data', TRAINING_DIR,
     '--adapter-path', OUTPUT_DIR,
     '--train',
     '--iters', '2000',
-    '--batch-size', '2',
+    '--batch-size', '1',
     '--num-layers', '8',
     '--learning-rate', '1e-4',
+    '--max-seq-length', '1024',
 ]
 
 print(f"Running: {' '.join(cmd)}\n")
@@ -66,7 +67,7 @@ print(f"\nLoRA adapters saved to: {OUTPUT_DIR}")
 # Fuse the adapters into the base model
 print(f"\nFusing adapters into base model...")
 fuse_cmd = [
-    sys.executable, '-m', 'mlx_lm.fuse',
+    '/usr/bin/arch', '-arm64', '/usr/bin/python3', '-m', 'mlx_lm.fuse',
     '--model', MODEL_NAME,
     '--adapter-path', OUTPUT_DIR,
     '--save-path', FUSED_DIR,

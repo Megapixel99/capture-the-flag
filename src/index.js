@@ -36,7 +36,10 @@ async function main() {
     }
   }
 
-  if (CONFIG.game.customBot) {
+  if (CONFIG.game.selfPlay) {
+    console.log(`[Mode] SELF-PLAY — 6 copies of custom bot competing against each other.`);
+    console.log(`[Mode] Round-robin scheduling (one agent at a time on GPU).\n`);
+  } else if (CONFIG.game.customBot) {
     console.log('[Mode] CUSTOM BOT enabled — log-trained agent competing as additional player.\n');
   }
 
@@ -198,12 +201,16 @@ async function main() {
     } catch { /* not running */ }
 
     if (!alive) {
-      const child = spawn(ollamaPath, ['serve'], {
+      // Force ARM64 on macOS to ensure Metal GPU access (Rosetta/x86 has no GPU)
+      const isMac = process.platform === 'darwin';
+      const spawnCmd = isMac ? '/usr/bin/arch' : ollamaPath;
+      const spawnArgs = isMac ? ['-arm64', ollamaPath, 'serve'] : ['serve'];
+      const child = spawn(spawnCmd, spawnArgs, {
         detached: true, stdio: 'ignore',
         env: { ...process.env },
       });
       child.unref();
-      console.log(`[Ollama] Started (PID ${child.pid})`);
+      console.log(`[Ollama] Started${isMac ? ' (ARM64)' : ''} (PID ${child.pid})`);
 
       for (let i = 0; i < 15; i++) {
         await new Promise((r) => setTimeout(r, 1000));
@@ -238,6 +245,112 @@ async function main() {
       }
     }
     console.log(`[Ollama] All models ready.\n`);
+
+  }
+
+  // --- Custom bot: ensure local Ollama is running and model is warm ---
+  if (CONFIG.game.customBot && !testMode) {
+    const axios = require('axios');
+    const { execSync, spawn } = require('child_process');
+    const url = CONFIG.api.ollama?.baseUrl || 'http://localhost:11434';
+
+    // Make sure Ollama is running (it may not have been started if we're in cloud-only mode)
+    let ollamaAlive = false;
+    try {
+      const r = await axios.get(`${url}/api/tags`, { timeout: 2000 });
+      ollamaAlive = r.status === 200;
+    } catch { /* not running */ }
+
+    if (!ollamaAlive) {
+      console.log('[Custom Bot] Local Ollama not running — starting it for custom bot...');
+      let ollamaPath = null;
+      try {
+        ollamaPath = execSync('which ollama 2>/dev/null', { encoding: 'utf-8' }).trim();
+      } catch {
+        for (const c of ['/usr/local/bin/ollama', '/opt/homebrew/bin/ollama', '/usr/bin/ollama']) {
+          try { require('fs').accessSync(c, require('fs').constants.X_OK); ollamaPath = c; break; } catch { /* */ }
+        }
+      }
+      if (ollamaPath) {
+        // Force ARM64 on macOS to ensure Metal GPU access (Rosetta/x86 has no GPU)
+        const isMac = process.platform === 'darwin';
+        const spawnCmd = isMac ? '/usr/bin/arch' : ollamaPath;
+        const spawnArgs = isMac ? ['-arm64', ollamaPath, 'serve'] : ['serve'];
+        const child = spawn(spawnCmd, spawnArgs, { detached: true, stdio: 'ignore', env: { ...process.env } });
+        child.unref();
+        for (let i = 0; i < 15; i++) {
+          await new Promise(r => setTimeout(r, 1000));
+          try {
+            const r2 = await axios.get(`${url}/api/tags`, { timeout: 2000 });
+            if (r2.status === 200) { ollamaAlive = true; break; }
+          } catch { /* retry */ }
+        }
+      }
+    }
+
+    if (ollamaAlive) {
+      // Warm the model and verify it landed on GPU
+      process.stdout.write('[Custom Bot] Warming up ctf-custom-q4...');
+      try {
+        await axios.post(`${url}/api/chat`, {
+          model: 'ctf-custom-q4',
+          messages: [{ role: 'user', content: 'hi' }],
+          stream: false, keep_alive: '60m', options: { num_predict: 1 },
+        }, { timeout: 300000 });
+
+        // Check GPU allocation — Ollama silently falls back to CPU which is ~45x slower
+        const ps = await axios.get(`${url}/api/ps`, { timeout: 5000 });
+        const botModel = (ps.data.models || []).find(m => m.name.startsWith('ctf-custom-q4'));
+        const vram = botModel?.size_vram || 0;
+        const total = botModel?.size || 1;
+        const gpuPct = Math.round((vram / total) * 100);
+
+        if (gpuPct < 50) {
+          console.log(` on CPU (${gpuPct}% GPU) — restarting Ollama for GPU access...`);
+          // Kill and restart Ollama to reclaim GPU
+          try { execSync('pkill ollama 2>/dev/null'); } catch { /* */ }
+          await new Promise(r => setTimeout(r, 2000));
+
+          let ollamaPath2 = null;
+          try { ollamaPath2 = execSync('which ollama 2>/dev/null', { encoding: 'utf-8' }).trim(); } catch {
+            for (const c of ['/usr/local/bin/ollama', '/opt/homebrew/bin/ollama', '/usr/bin/ollama']) {
+              try { require('fs').accessSync(c, require('fs').constants.X_OK); ollamaPath2 = c; break; } catch { /* */ }
+            }
+          }
+          if (ollamaPath2) {
+            const isMac2 = process.platform === 'darwin';
+            const cmd2 = isMac2 ? '/usr/bin/arch' : ollamaPath2;
+            const args2 = isMac2 ? ['-arm64', ollamaPath2, 'serve'] : ['serve'];
+            const child2 = spawn(cmd2, args2, { detached: true, stdio: 'ignore', env: { ...process.env } });
+            child2.unref();
+            for (let i = 0; i < 15; i++) {
+              await new Promise(r => setTimeout(r, 1000));
+              try {
+                const r2 = await axios.get(`${url}/api/tags`, { timeout: 2000 });
+                if (r2.status === 200) break;
+              } catch { /* retry */ }
+            }
+            // Re-warm after restart
+            await axios.post(`${url}/api/chat`, {
+              model: 'ctf-custom-q4',
+              messages: [{ role: 'user', content: 'hi' }],
+              stream: false, keep_alive: '60m', options: { num_predict: 1 },
+            }, { timeout: 300000 });
+
+            const ps2 = await axios.get(`${url}/api/ps`, { timeout: 5000 });
+            const botModel2 = (ps2.data.models || []).find(m => m.name.startsWith('ctf-custom-q4'));
+            const gpuPct2 = Math.round(((botModel2?.size_vram || 0) / (botModel2?.size || 1)) * 100);
+            console.log(`[Custom Bot] After restart: ${gpuPct2}% GPU — ${gpuPct2 >= 50 ? 'ready (~90 tok/s)' : 'still on CPU, expect slow turns'}`);
+          }
+        } else {
+          console.log(` ready (${gpuPct}% GPU, ~90 tok/s)`);
+        }
+      } catch (err) {
+        console.log(` failed (${err.message})`);
+      }
+    } else {
+      console.warn('[Custom Bot] WARNING: Could not start Ollama — custom bot will not work.');
+    }
   }
 
   // --- Game loop (runs once normally, repeats with --loop) ---
