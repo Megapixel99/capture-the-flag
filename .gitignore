@@ -8,4 +8,5 @@ training/*.jsonl
 training/__pycache__/
 reports/~$*.docx
 reports/*.zip
+reports/videos/
 .claude/settings.local.json
