@@ -6,7 +6,6 @@ training/ctf-model-lora/
 training/ctf-model-lora-*-snapshot/
 training/*.jsonl
 training/__pycache__/
-reports/~$*.docx
-reports/*.zip
-reports/videos/
+reports/*
+!reports/*.py
 .claude/settings.local.json

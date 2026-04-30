@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.11
 """Render a CTF game session as a short animated MP4.
 
 The video is a 30-fps replay of one session: a timeline cursor sweeps
@@ -21,6 +21,7 @@ import json
 import os
 import re
 import sys
+import time
 from datetime import datetime
 
 import matplotlib
@@ -123,6 +124,21 @@ def load_session(session_dir):
             injections.append({'ts': parse_ts(e.get('timestamp')),
                                'victim': e.get('player') or e.get('victim', '')})
 
+    # Patches — derived from successive vuln_check reports.
+    # A vuln present in check N's unpatched-list and absent in check N+1's is a patch.
+    vuln_checks = []
+    for e in events:
+        if e.get('message') == 'Vulnerability check' and isinstance(e.get('report'), dict):
+            vuln_checks.append({'ts': parse_ts(e.get('timestamp')),
+                                'report': e['report']})
+    patches = []
+    for prev, cur in zip(vuln_checks, vuln_checks[1:]):
+        for player, vlist in prev['report'].items():
+            prev_set = {v.strip() for v in vlist.split(',') if v.strip()}
+            cur_set = {v.strip() for v in cur['report'].get(player, '').split(',') if v.strip()}
+            for fixed in (prev_set - cur_set):
+                patches.append({'ts': cur['ts'], 'player': player, 'vuln': fixed})
+
     # Detect mode for caption
     config = next((e['config'] for e in events if isinstance(e.get('config'), dict)), {})
 
@@ -130,12 +146,17 @@ def load_session(session_dir):
         'session_name': os.path.basename(session_dir),
         'game_start': game_start, 'defense_start': defense_start,
         'battle_start': battle_start, 'game_end': game_end,
-        'captures': captures, 'injections': injections,
+        'captures': captures, 'injections': injections, 'patches': patches,
         'player_ids': player_ids, 'config': config,
     }
 
 
-def render_video(data, output_path, duration_sec=30, fps=30):
+def _log(msg):
+    """Timestamped progress line — flush so it shows up live."""
+    print(f'[{time.strftime("%H:%M:%S")}] {msg}', flush=True)
+
+
+def render_video(data, output_path, duration_sec=30, fps=30, verbose=True):
     """Write the session animation to output_path. Returns success bool."""
     start = data['game_start']; end = data['game_end']
     if not (start and end):
@@ -151,12 +172,22 @@ def render_video(data, output_path, duration_sec=30, fps=30):
         print('  Cannot render: no players found', file=sys.stderr)
         return False
 
+    if verbose:
+        _log(f'session: {data["session_name"]}')
+        _log(f'  game length: {total_real_seconds:.1f}s real time, '
+             f'{len(data["captures"])} captures, '
+             f'{len(data.get("patches", []))} patches, '
+             f'{len(data["injections"])} vuln injections')
+        _log(f'  rendering {total_frames} frames ({duration_sec}s @ {fps}fps) → {output_path}')
+
     # Sort players to match scoreboard layout (alphabetical, custom-bot first if present)
     players = sorted(players, key=lambda p: (0 if p == 'custom-bot' else 1, p))
 
     # Pre-compute event times in real-seconds-from-start
     cap_seconds = [(c, max(0, (c['ts'] - start).total_seconds())) for c in data['captures'] if c['ts']]
     inj_seconds = [(i, max(0, (i['ts'] - start).total_seconds())) for i in data['injections'] if i['ts']]
+    patch_seconds = [(p, max(0, (p['ts'] - start).total_seconds()))
+                     for p in data.get('patches', []) if p['ts']]
 
     # Build the figure layout: title strip, scoreboard, timeline, event log
     fig = plt.figure(figsize=(12, 7), dpi=120)
@@ -185,25 +216,37 @@ def render_video(data, output_path, duration_sec=30, fps=30):
     ax_score.spines['left'].set_visible(False)
     ax_score.set_yticks([])
     ax_score.set_xticks([])
+    # Layout per row (1 unit tall):
+    #   y = i - 0.36  (top)    : player name (left) + "X pts" (right)
+    #   y = i         (middle) : thin filled bar — never overlaps text
+    #   y = i + 0.36  (bottom) : stats line "flags N  bonus M  own: safe/LOST"
     bar_artists = []
     name_artists = []
     score_artists = []
     cap_artists = []
+    BAR_HEIGHT = 0.22
     for i, p in enumerate(players):
         c = color_for(p)
-        # Filled bar (scaled later)
-        bar = ax_score.barh(i, 0, color=c, height=0.55, edgecolor='#333', linewidth=0.6)[0]
+        # Faint background track so the bar's max extent is visible
+        ax_score.barh(i, 1.0, color='#E5E7EB', height=BAR_HEIGHT,
+                      edgecolor='none', zorder=1)
+        # Filled bar (width set per frame)
+        bar = ax_score.barh(i, 0, color=c, height=BAR_HEIGHT,
+                            edgecolor='#333', linewidth=0.5, zorder=2)[0]
         bar_artists.append(bar)
-        name_artists.append(ax_score.text(0.01, i - 0.32, friendly(p), fontsize=10,
+        name_artists.append(ax_score.text(0.0, i - 0.36, friendly(p), fontsize=10,
                                           fontweight='bold', va='center'))
-        score_artists.append(ax_score.text(0.99, i, '0 pts', fontsize=10, ha='right', va='center',
-                                            color='#333'))
-        cap_artists.append(ax_score.text(0.01, i + 0.32, '', fontsize=8, va='center', color='#666'))
+        score_artists.append(ax_score.text(1.0, i - 0.36, '0 pts', fontsize=10,
+                                            ha='right', va='center', color='#111'))
+        cap_artists.append(ax_score.text(0.0, i + 0.36, '', fontsize=8.5,
+                                          va='center', color='#555'))
 
     # Timeline
     ax_time.set_xlim(0, total_real_seconds); ax_time.set_ylim(0, 1)
-    ax_time.set_yticks([]); ax_time.spines['top'].set_visible(False)
+    ax_time.set_xticks([]); ax_time.set_yticks([])
+    ax_time.spines['top'].set_visible(False)
     ax_time.spines['right'].set_visible(False); ax_time.spines['left'].set_visible(False)
+    ax_time.spines['bottom'].set_visible(False)
     ax_time.set_title('Timeline', fontsize=12, fontweight='bold', loc='left')
     # Phase backgrounds
     if data['defense_start'] and data['battle_start']:
@@ -229,34 +272,62 @@ def render_video(data, output_path, duration_sec=30, fps=30):
     ax_log.set_xlim(0, 1); ax_log.set_ylim(0, 1)
     log_text = ax_log.text(0.02, 0.97, '', fontsize=9, va='top', family='monospace', color='#333')
 
-    # Pre-place markers (initially invisible) to avoid creating artists per frame
+    # Pre-place markers as Line2D point artists (display-coord sized so they
+    # don't get stretched by the timeline's wide aspect ratio).
+    # Flag capture = circle, bonus = diamond, vuln injection = downward triangle.
     marker_artists = []
     for cap, sec in cap_seconds:
         c = color_for(cap['attacker'])
-        if cap['is_bonus']:
-            m = patches.Rectangle((sec - 6, 0.32), 12, 0.36, facecolor=c, edgecolor='white',
-                                  linewidth=1.2, zorder=8)
-            tr = matplotlib.transforms.Affine2D().rotate_deg_around(sec, 0.5, 45) + ax_time.transData
-            m.set_transform(tr)
-        else:
-            m = patches.Circle((sec, 0.5), radius=6, facecolor=c, edgecolor='white',
-                               linewidth=1.2, zorder=8, transform=ax_time.transData)
+        marker = 'D' if cap['is_bonus'] else 'o'
+        size = 11 if cap['is_bonus'] else 13
+        (m,) = ax_time.plot([sec], [0.5], marker=marker, markersize=size,
+                            markerfacecolor=c, markeredgecolor='white',
+                            markeredgewidth=1.4, linestyle='None', zorder=8)
         m.set_visible(False)
-        ax_time.add_patch(m)
         marker_artists.append((m, sec))
     inj_artists = []
     for inj, sec in inj_seconds:
-        m = patches.Polygon([[sec, 0.18], [sec - 4, 0.06], [sec + 4, 0.06]], closed=True,
-                            facecolor='#EF4444', zorder=7)
+        (m,) = ax_time.plot([sec], [0.18], marker='v', markersize=9,
+                            markerfacecolor='#EF4444', markeredgecolor='white',
+                            markeredgewidth=1.0, linestyle='None', zorder=7)
         m.set_visible(False)
-        ax_time.add_patch(m)
         inj_artists.append((m, sec))
+    # Patches (derived from vuln_check deltas) — green up-triangle, top of timeline
+    patch_artists = []
+    for patch, sec in patch_seconds:
+        (m,) = ax_time.plot([sec], [0.82], marker='^', markersize=9,
+                            markerfacecolor='#10B981', markeredgecolor='white',
+                            markeredgewidth=1.0, linestyle='None', zorder=7)
+        m.set_visible(False)
+        patch_artists.append((m, sec))
+
+    # Marker legend (top-right of timeline) — helpful for presentations
+    from matplotlib.lines import Line2D
+    legend_handles = [
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='#888',
+               markeredgecolor='white', markeredgewidth=1.2, markersize=10,
+               label='Flag capture'),
+        Line2D([0], [0], marker='D', color='w', markerfacecolor='#888',
+               markeredgecolor='white', markeredgewidth=1.2, markersize=9,
+               label='Bonus flag'),
+        Line2D([0], [0], marker='^', color='w', markerfacecolor='#10B981',
+               markeredgecolor='white', markeredgewidth=1.0, markersize=8,
+               label='Patch'),
+        Line2D([0], [0], marker='v', color='w', markerfacecolor='#EF4444',
+               markeredgecolor='white', markeredgewidth=1.0, markersize=8,
+               label='Vuln injected'),
+    ]
+    ax_time.legend(handles=legend_handles, loc='upper right',
+                   bbox_to_anchor=(1.0, 1.45), ncol=4, fontsize=8,
+                   frameon=False, handletextpad=0.4, columnspacing=1.2)
 
     # Score state — incremented when capture events fire.
     # Scoring rules: first capture +100, subsequent +25, bonuses use cap['points'].
     scores = {p: 0 for p in players}
     caps_so_far = {p: 0 for p in players}
+    bonuses_so_far = {p: 0 for p in players}
     losses_so_far = {p: 0 for p in players}
+    patches_so_far = {p: 0 for p in players}
     flag_taken = set()  # victim ids whose flag has been first-captured (for survival bonus tracking)
 
     # Pre-compute what events have happened by each frame so update_frame is cheap
@@ -268,6 +339,9 @@ def render_video(data, output_path, duration_sec=30, fps=30):
     for inj, sec in inj_seconds:
         f = min(total_frames - 1, int(sec / real_per_frame))
         events_for_frame.append((f, 'inj', inj))
+    for patch, sec in patch_seconds:
+        f = min(total_frames - 1, int(sec / real_per_frame))
+        events_for_frame.append((f, 'patch', patch))
     events_for_frame.sort(key=lambda x: x[0])
 
     # Recent log entries (last few)
@@ -283,8 +357,10 @@ def render_video(data, output_path, duration_sec=30, fps=30):
                 cap = payload
                 pts = cap.get('points', 0)
                 scores[cap['attacker']] = scores.get(cap['attacker'], 0) + pts
-                caps_so_far[cap['attacker']] = caps_so_far.get(cap['attacker'], 0) + 1
-                if not cap['is_bonus']:
+                if cap['is_bonus']:
+                    bonuses_so_far[cap['attacker']] = bonuses_so_far.get(cap['attacker'], 0) + 1
+                else:
+                    caps_so_far[cap['attacker']] = caps_so_far.get(cap['attacker'], 0) + 1
                     losses_so_far[cap['victim']] = losses_so_far.get(cap['victim'], 0) + 1
                 # Apply -25 to victim only on first non-bonus capture
                 if not cap['is_bonus'] and cap['is_first']:
@@ -294,19 +370,29 @@ def render_video(data, output_path, duration_sec=30, fps=30):
                     if abs(sec - (cap['ts'] - start).total_seconds()) < 0.01:
                         m.set_visible(True)
                 # Log line
-                tag = 'BONUS' if cap['is_bonus'] else 'FLAG'
+                tag = '* BONUS' if cap['is_bonus'] else 'FLAG  '
                 t_str = f"{int((cap['ts'] - start).total_seconds()) // 60}:" \
                         f"{int((cap['ts'] - start).total_seconds()) % 60:02d}"
                 log_lines.append(f"{t_str} {tag} {friendly(cap['attacker'])[:14]} → "
                                  f"{friendly(cap['victim'])[:14]}")
-            else:
+            elif kind == 'inj':
                 inj = payload
                 for m, sec in inj_artists:
                     if abs(sec - (inj['ts'] - start).total_seconds()) < 0.01:
                         m.set_visible(True)
                 t_str = f"{int((inj['ts'] - start).total_seconds()) // 60}:" \
                         f"{int((inj['ts'] - start).total_seconds()) % 60:02d}"
-                log_lines.append(f"{t_str} VULN injected on {friendly(inj['victim'])[:14]}")
+                log_lines.append(f"{t_str} VULN  injected on {friendly(inj['victim'])[:14]}")
+            else:  # 'patch'
+                patch = payload
+                patches_so_far[patch['player']] = patches_so_far.get(patch['player'], 0) + 1
+                for m, sec in patch_artists:
+                    if abs(sec - (patch['ts'] - start).total_seconds()) < 0.01:
+                        m.set_visible(True)
+                t_str = f"{int((patch['ts'] - start).total_seconds()) // 60}:" \
+                        f"{int((patch['ts'] - start).total_seconds()) % 60:02d}"
+                log_lines.append(f"{t_str} PATCH {friendly(patch['player'])[:14]} "
+                                 f"fixed {patch['vuln'][:18]}")
 
         # Update the cursor
         cur_real_sec = frame * real_per_frame
@@ -322,7 +408,9 @@ def render_video(data, output_path, duration_sec=30, fps=30):
             bar_artists[i].set_width(display_w)
             score_artists[i].set_text(f"{s} pts")
             cap_artists[i].set_text(
-                f"caps {caps_so_far.get(p,0)}  flag: {'lost' if losses_so_far.get(p,0) else 'safe'}"
+                f"flags {caps_so_far.get(p,0)}  bonus {bonuses_so_far.get(p,0)}  "
+                f"patches {patches_so_far.get(p,0)}  "
+                f"own: {'LOST' if losses_so_far.get(p,0) else 'safe'}"
             )
 
         # Recent events log (last 6)
@@ -335,8 +423,30 @@ def render_video(data, output_path, duration_sec=30, fps=30):
         return False
     writer = animation.writers['ffmpeg'](fps=fps, bitrate=2400, codec='h264')
     anim = animation.FuncAnimation(fig, update, frames=total_frames, interval=1000/fps, blit=False)
-    anim.save(output_path, writer=writer, dpi=120)
+
+    # Progress callback — log every ~5% (or every frame if very short)
+    t0 = time.time()
+    log_every = max(1, total_frames // 20)
+
+    def progress(cur, total):
+        if not verbose:
+            return
+        if cur == 0:
+            _log(f'  frame 0/{total}…')
+            return
+        if cur % log_every == 0 or cur == total - 1:
+            elapsed = time.time() - t0
+            rate = (cur + 1) / max(elapsed, 1e-3)
+            eta = (total - cur - 1) / max(rate, 1e-3)
+            pct = 100.0 * (cur + 1) / total
+            _log(f'  frame {cur+1}/{total}  ({pct:5.1f}%)  '
+                 f'{rate:4.1f} fps  elapsed {elapsed:5.1f}s  eta {eta:5.1f}s')
+
+    anim.save(output_path, writer=writer, dpi=120, progress_callback=progress)
     plt.close(fig)
+    if verbose:
+        size_mb = os.path.getsize(output_path) / 1e6
+        _log(f'  done in {time.time() - t0:.1f}s — wrote {size_mb:.2f} MB')
     return True
 
 
@@ -362,16 +472,18 @@ def main():
             sessions = sessions[-args.recent:]
         print(f'Rendering {len(sessions)} sessions to {out_dir}/')
         rendered = 0
-        for sd in sessions:
+        for idx, sd in enumerate(sessions, 1):
             data = load_session(sd)
             if not data:
+                _log(f'[{idx}/{len(sessions)}] skip {os.path.basename(sd)} (no game.json)')
                 continue
             out_path = os.path.join(out_dir, data['session_name'] + '.mp4')
-            print(f'  {data["session_name"]}...', end=' ', flush=True)
+            _log(f'[{idx}/{len(sessions)}] {data["session_name"]}')
             ok = render_video(data, out_path, duration_sec=args.duration, fps=args.fps)
-            print('OK' if ok else 'FAILED')
             if ok:
                 rendered += 1
+            else:
+                _log('  FAILED')
         print(f'Rendered {rendered} videos.')
         return
 

@@ -37,10 +37,10 @@ full event stream (`game.json`), per-agent transcripts, and a summary.
 | Defense training (asymmetric) | `--defense-training`                 | attackers see vuln list; defender data only   |
 | Loop forever                  | append `--loop` to any of the above  | restarts a new game when one finishes         |
 
-Match structure: a 3-minute **defense phase** (everyone hardens their box),
-followed by a **battle phase** where agents look for flags on opponents'
-machines. Captures and bonus flags score points; losing your flag costs
-points. Scores are persisted in each session's `game.json`.
+Match structure: a 30-second **defense phase** (everyone hardens their box),
+followed by a 5-minute **battle phase** where agents look for flags on
+opponents' machines. Captures and bonus flags score points; losing your
+flag costs points. Scores are persisted in each session's `game.json`.
 
 ## Repository layout
 
@@ -114,8 +114,8 @@ python3 reports/session_viewer.py --all
 open reports/viewers/index.html
 
 # Per-session MP4 replay (matplotlib + ffmpeg)
-python3 reports/session_video.py logs/session-2026-04-20T16-21-35-241Z
-python3 reports/session_video.py --all --recent 10
+python3.11 reports/session_video.py logs/session-2026-04-20T16-21-35-241Z
+python3.11 reports/session_video.py --all --recent 10
 ```
 
 The reports include scoring trends, attack-method breakdowns, capture-vs-loss
