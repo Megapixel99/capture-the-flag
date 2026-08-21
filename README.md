@@ -5,6 +5,14 @@ attack and defend isolated Docker containers in a capture-the-flag tournament,
 producing logs, statistical reports, and training data for fine-tuning a
 custom model.
 
+**Write-ups:** [An AI Capture-the-Flag Tournament: What the Scoreboard
+Counted](https://sethwheeler.dev/blog/ai-capture-the-flag/) — the engine credited 2 of
+one model's 279 logged captures, which is most of why the ranking looked like a
+parameter-count story. And [How a Dedup Pass Deleted My Training
+Curriculum](https://sethwheeler.dev/blog/dedup-deleted-curriculum/) — the graded
+curriculum was weighted 6x by duplication, then deduplicated back to one copy each
+before the trainer ever saw it.
+
 The project supports two parallel research tracks:
 
 1. **Comparative offense / defense study** of frontier and mid-size LLMs
