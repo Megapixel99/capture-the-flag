@@ -5,6 +5,9 @@ attack and defend isolated Docker containers in a capture-the-flag tournament,
 producing logs, statistical reports, and training data for fine-tuning a
 custom model.
 
+Built for a course at Azusa Pacific University, with coding agents doing much of the
+implementation.
+
 **Write-ups:** [An AI Capture-the-Flag Tournament: What the Scoreboard
 Counted](https://sethwheeler.dev/blog/ai-capture-the-flag/) — the engine credited 2 of
 one model's 279 logged captures, which is most of why the ranking looked like a
