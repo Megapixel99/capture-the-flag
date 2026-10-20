@@ -5,6 +5,11 @@ attack and defend isolated Docker containers in a capture-the-flag tournament,
 producing logs, statistical reports, and training data for fine-tuning a
 custom model.
 
+> **Note on authorship.** This is an experimental research project, built for a course
+> at Azusa Pacific University. The concept, research questions, and system design are
+> mine; much of the implementation was AI-assisted (built with coding agents). The
+> numbers and findings here are exploratory, not rigorously validated.
+
 The project supports two parallel research tracks:
 
 1. **Comparative offense / defense study** of frontier and mid-size LLMs
